@@ -15,7 +15,7 @@ OUTPUT = ROOT / '.zig-cache/github-pages'
 DOCUMENTS = ['docs/ARCHITECTURE.md', 'docs/USING.md',
              'reports/2026-09-06-windows-iocp.md', 'reports/2026-09-06-windows-shards.md']
 DIAGRAMS = ['docs/diagrams/' + name + '.svg' for name in
-            ('topology', 'startup', 'request-lifecycle', 'output-arena')]
+            ('topology', 'startup', 'request-lifecycle', 'output-arena', 'windows-handoff')]
 READER = ['docs/read.html', 'docs/reader.js', 'docs/reader.css']
 
 
