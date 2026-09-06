@@ -1,3 +1,36 @@
+# Worker streaming merged — 2026-09-06
+
+[PR #3](https://github.com/technologylab-ai/bounded-http/pull/3) merged at `86e8ec2cc5fbe9f5d08ed01c496d61ae519cf261`.
+The merge exactly preserves qualified feature `2a269ef57301b21df22f1c616d02d6d244e5d6ca` and Git tree `2465f8b25ce564cfc81e72daffe890b77c62a832`.
+`Context.flushAndWait()` lets a fixed worker flush and continue on its existing callback stack.
+One active callback occupies one reserved worker; inline callbacks reject the operation.
+Cancellation retains output until kernel borrows end; callback return remains necessary before slot reuse.
+Original deadlines, cumulative response limits, and the return-and-resume API remain unchanged.
+See the [worker flush contract](docs/USING.md#flush-within-a-worker-callback) and [ownership guide](docs/OWNERSHIP.md).
+
+[Windows run 34048745802](https://github.com/technologylab-ai/bounded-http/actions/runs/34048745802) passed on the exact feature commit.
+Both Zig 0.16.0 modes passed 115 tests with four POSIX skips; 89 wire cases and 30,000 exact smoke responses passed.
+Mac passed 100 tests with four platform skips per mode; Linux passed 102 tests with two skips per mode.
+Both hosts passed 84 wire cases, nine comparator tests, and 30,000 exact smoke responses.
+Linux executed tree-identical `62c238a76ff3fd09ec425066a8a8d7dc3449e733`; the original runtime identity remains unchanged.
+The curator checked all 329 Linux, 33 Mac, and 28 Windows recorded source hashes against the feature.
+An independent lifecycle review found no material defect.
+
+Baz's focused streaming suite passed 14 groups per native platform using the pinned feature dependency.
+[Linux/macOS run 34049191530](https://github.com/technologylab-ai/baz/actions/runs/34049191530) and [Windows run 34049191487](https://github.com/technologylab-ai/baz/actions/runs/34049191487) preserve those hosted results.
+These cases exercise live callback flushing, client-controlled first-chunk delivery, cancellation, backpressure, and slot reuse.
+The committed engine unit fixtures alone do not establish that end-to-end path.
+The curator checked 147 retained packet hashes in `../baz-streaming/reports/2026-09-06-streaming/`.
+That separate session owns publication of its currently uncommitted report and packet; preserve its worktree.
+These are correctness results, with no new throughput or arbitrary application-preemption claim.
+
+[Pages run 34050105227](https://github.com/technologylab-ai/bounded-http/actions/runs/34050105227) published the exact merge.
+The live integration guide matches the merged document bytes.
+Canonical main is synced; preserve `../bounded-http-streaming` and the other feature worktrees.
+The wiki's existing Windows source records retain their earlier feature identity.
+The [roadmap](ROADMAP.md) retains API, reliability, performance, and higher-level work.
+The historical checkpoints below retain their original scope.
+
 # Windows shards merged — 2026-09-06
 
 [PR #2](https://github.com/technologylab-ai/bounded-http/pull/2) merged with explicit user approval.
