@@ -15,7 +15,7 @@ sockets with `kqueue`. Application callbacks can run on the I/O owner or on fixe
 Inline execution is the default for trusted bounded, nonblocking handlers;
 blocking callbacks must explicitly select fixed startup workers. Windows support is pending and currently produces
 a compile error. This is the M4 implementation informed by the adjacent
-[Zig LLM Wiki](https://github.com/technologylab-ai/zigllmwiki/blob/main/wiki/bounded-http-server-design.md).
+[Zig LLM Wiki](https://technologylab-ai.github.io/zigllmwiki/?page=wiki/bounded-http-server-design.md).
 
 The first goal is a working ownership and pending/resume model that we can
 measure and change. This is not a production qualification or a TechEmpower

@@ -349,7 +349,7 @@ Use `/tmp/zig-http-measurement.lock` on both `maxross` and `omarx1`.
 Record owner metadata and inspect existing measurement processes before starting work.
 Retain the reservation until every child process has stopped.
 Release only your own reservation.
-Follow the [wiki platform runbook](https://github.com/technologylab-ai/zigllmwiki/blob/main/docs/platform-testing.md) for the complete protocol.
+Follow the [wiki platform runbook](https://technologylab-ai.github.io/zigllmwiki/?page=docs/platform-testing.md) for the complete protocol.
 
 The [Linux verification wrapper](../tools/verify_linux_ssh.sh) runs maintained native gates through `ssh omarx1`.
 That wrapper does not acquire the host reservation for its caller.

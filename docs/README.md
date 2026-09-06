@@ -35,7 +35,7 @@ python3 tools/render_whitepaper.py
 
 The renderer performs no runtime measurements.
 Preserve source revisions, environments, sample ranges, and measurement limits when updating performance prose.
-The [writing policy](https://github.com/technologylab-ai/zigllmwiki/blob/main/docs/technical-writing.md) applies to repository prose.
+The [writing policy](https://technologylab-ai.github.io/zigllmwiki/?page=docs/technical-writing.md) applies to repository prose.
 Code identifiers and exact-format text remain exempt.
 
 ## Read and publish on the web
@@ -43,6 +43,9 @@ Code identifiers and exact-format text remain exempt.
 The [public site](https://technologylab-ai.github.io/zig-http/) serves the whitepaper and its architecture and integration guides.
 The browser reader renders Markdown, tables, heading links, diagrams, and highlighted code.
 Source and evidence links open the public GitHub repository at the deployment revision.
+Wiki navigation opens the [standalone wiki reader](https://technologylab-ai.github.io/zigllmwiki/).
+Use its `page` query parameter with a wiki repository path for new viewing links.
+Preserve immutable GitHub revision links when citing pinned evidence.
 The standalone whitepaper remains readable without JavaScript.
 The Markdown reader requires JavaScript and an HTTP server.
 

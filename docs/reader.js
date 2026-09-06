@@ -101,7 +101,10 @@
   }
   async function load() {
     const file = new URLSearchParams(location.search).get('file') || 'docs/ARCHITECTURE.md';
-    if (file.startsWith('/') || /^[a-z]+:/i.test(file)) throw new Error('Choose a document from the navigation.');
+    // Validate the decoded query before URL normalization can erase dot segments.
+    if (file.startsWith('/') || !/^[A-Za-z0-9_./-]+$/.test(file) || file.split('/').some(part => part === '.' || part === '..')) {
+      throw new Error('Choose a document from the navigation.');
+    }
     const source = new URL(file, root);
     const path = pathOf(source);
     if (path === null || !textExtensions.test(path)) throw new Error('Choose a document from the navigation.');

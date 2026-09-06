@@ -3,6 +3,9 @@
 The architecture documentation is on main; preserve the earlier `docs/server-architecture` worktree.
 The `docs/github-pages` branch adds the public site and Markdown reader.
 Both the HTTP and wiki repositories are public by the user’s 2026-09-06 authorization.
+The whitepaper and guides link to the [standalone wiki](https://technologylab-ai.github.io/zigllmwiki/).
+Wiki links use its `page` query parameter and preserve Markdown heading fragments.
+Pinned evidence retains its original revision links.
 The [Pages site](https://technologylab-ai.github.io/zig-http/) publishes through `.github/workflows/pages.yml`.
 Run `python3 tools/build_pages.py` to check the explicit publication artifact.
 Run `python3 tools/serve_docs.py` for local Markdown and highlighted-source browsing.
