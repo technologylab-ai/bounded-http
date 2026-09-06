@@ -715,6 +715,10 @@
 <li><strong>Prepare, seal, then run.</strong><p>Initialize <code>Budget</code> and <code>Cluster</code>. Prepare threads, seal the allocator and enter <code>Cluster.run()</code>.</p></li>
 <li><strong>Preserve failure ownership.</strong><p>Collect statistics after a successful run. Do not unwind borrowed storage after an uncertain failure.</p></li>
 </ol>
+<h3>Reserve output before application side effects.</h3>
+<p>A response adapter translates higher-level application output into writer operations. An adapter can configure a complete draft reservation before startup.</p>
+<p>The owner drains earlier batched responses before initial dispatch when that reservation cannot fit. The framework does not replay application side effects.</p>
+<p>Checked draft operations support additional headers and generated bodies. Existing streaming and borrowed-output operations remain available.</p>
 <pre><code>cd examples/embedding
 zig build run -Doptimize=ReleaseSafe -- --port 8081 --duration-ms 30000</code></pre>
 <p class="note">From another terminal:</p><pre><code>curl --http1.1 http://127.0.0.1:8081/</code></pre>
@@ -740,8 +744,9 @@ zig build run -Doptimize=ReleaseSafe -- --port 8081 --duration-ms 30000</code></
 </section>
 <section class="section" id="references">
 <p class="eyebrow">09 / Sources and further reading</p><h2>Read the implementation.<br>Reproduce the evidence.</h2>
-<p>This paper describes runtime source at <code>4b3cd5551d80b422ec6ef763627d019e6f1dfb83</code>. The measured candidate was <code>bbcec8aa9516efc470238b9edeea4f01b1f4a6d7</code>.</p>
+<p>The core architecture and recorded runtime evidence use source at <code>4b3cd5551d80b422ec6ef763627d019e6f1dfb83</code>. The measured candidate was <code>bbcec8aa9516efc470238b9edeea4f01b1f4a6d7</code>.</p>
 <p>The measurements retain the earlier <code>zig-http</code> name and original binaries. The rename changes product identification, not the measured evidence.</p>
+<p>The response-adapter addition is pinned at <a href="https://github.com/technologylab-ai/bounded-http/tree/e52f09f723388685263d14a9bfa265f2456a3744"><code>e52f09f723388685263d14a9bfa265f2456a3744</code></a>. Its native correctness checks add no performance measurement.</p>
 <ol class="refs">
 <li><a href="read.html?file=docs/ARCHITECTURE.md">Architecture guide</a> · concepts, startup order, scheduling, resources and shutdown.</li>
 <li><a href="read.html?file=docs/USING.md">Integration guide</a> · dependency setup, callbacks, response writing and operational checks.</li>
