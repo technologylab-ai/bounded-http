@@ -152,7 +152,7 @@ pub fn main(init: std.process.Init) !void {
         framework.failFast(70);
     };
     if (cluster.shards.len > 1) {
-        // Per-shard admission shows how the kernel distributed connections.
+        // Per-shard admission shows how the platform distributed connections.
         std.debug.print("SHARDS", .{});
         for (cluster.shards) |shard| std.debug.print(" accepted={d}/completed={d}", .{ shard.stats.accepted, shard.stats.completed });
         std.debug.print("\n", .{});

@@ -35,7 +35,10 @@ On Windows, run the executable from PowerShell:
 .\zig-out\bin\bounded-http.exe --port 8080 --connections 128 --shards 1
 ```
 
-Windows currently requires one shard.
+Windows defaults to one shard.
+Use `--shards 3` to select three independent IOCP owners with one bounded socket distributor.
+Only inline execution supports multiple shards.
+The [handoff guide](ARCHITECTURE.md#windows-socket-handoff) explains ownership, resource bounds, and shutdown.
 Use native x64 Zig 0.16.0 for the maintained Windows gate.
 
 The server prints `READY` to stderr after preparing its resources.
@@ -354,6 +357,8 @@ Worker execution currently requires one shard.
 Automatic inline callback limits use connections multiplied by the effective batch limit, capped at 8192.
 Automatic Linux shards use the allowed CPU count, capped at 16.
 Automatic macOS, Windows, and worker configurations use one shard.
+Explicit Linux and Windows inline configurations accept `shards` from 1 through 64.
+Windows distributes accepted sockets before receiving request bytes.
 Each shard reserves the full configured connection capacity.
 More shards therefore increase framework heap requirements despite the shared admission ceiling.
 
@@ -407,6 +412,8 @@ Cross-compilation does not establish runtime behavior.
 The manual [Windows workflow](../.github/workflows/windows-runtime-verify.yml) runs native x64 correctness gates on GitHub-hosted Windows.
 Its [supervisor](../tools/verify_windows.py) applies finite process watchdogs and captures evidence even after failure.
 The Windows suite explicitly skips four fixtures that require POSIX process suspension.
+A separate nine-case suite exercises two, three, and four Windows owners.
+The [shard receipt](../reports/2026-09-06-windows-shards.md) records distribution, admission, and shutdown evidence.
 CPU accounting fields remain `null` where the Windows client cannot measure them.
 
 | Tool or suite | Purpose |

@@ -1,3 +1,46 @@
+# Windows shard PR handoff — 2026-09-06
+
+Windows now has bounded socket distribution across independent IOCP owners on the feature branch.
+The user requested a PR, so main remains unchanged and this work must not be merged automatically.
+Worktree: `../bounded-http-windows-shards`; branch: `feat/windows-shards`.
+
+Shard zero owns one exclusive listener and processes its own round-robin share.
+Secondary owners receive unassociated sockets through startup-fixed queues before receiving request bytes.
+Shared admission includes queued sockets and sockets moving between owners.
+A publication barrier prevents receivers from exiting before the last possible queue entry.
+Each original acceptance deadline survives transfer.
+The callback, writer, Linux scheduling, and macOS topology contracts remain unchanged.
+
+The [new receipt](reports/2026-09-06-windows-shards.md) pins candidate `514c901fafd005f140a0a6fdf10ee28d0ff8796a`.
+[Native Windows run 34043829095](https://github.com/technologylab-ai/bounded-http/actions/runs/34043829095) passed exact Zig 0.16.0 Debug and ReleaseSafe.
+Each mode passed 16 steps and 95 tests, with four explicit POSIX skips.
+Windows passed 89 wire cases, four explicit POSIX wire skips, nine comparator cases, and 30,000 exact smoke responses.
+Both embedding probes passed; final ownership and late allocation counters were zero.
+The immutable raw packet includes source hashes, hosted metadata, commands, watchdogs, and artifact digest.
+
+The same candidate passed Linux Debug and ReleaseSafe with 82 tests and two Windows skips per mode.
+Linux passed 84 wire cases, nine comparator cases, both embedding probes, and 30,000 exact smoke responses.
+The native Windows fixtures exercise one through four owners; higher configured counts lack separate runtime coverage.
+Windows remains one shard by default; explicit inline configurations permit up to 64 within the resource budget.
+Worker execution and macOS remain single-shard.
+Windows throughput and physical deployment remain unqualified.
+
+The illustrated architecture and whitepaper now include a seventh SVG for Windows handoff.
+The documentation reader includes the new native shard receipt.
+Final publication gates belong to the PR's exact pushed feature commit; consult its checks and description.
+Do not reinterpret this candidate receipt as evidence for an unidentified later source tree.
+
+After review and merge, sync the wiki's Windows HTTP synthesis with the merged implementation and pinned report.
+The wiki's M3-006 remains postponed.
+The [roadmap](ROADMAP.md) still contains API, reliability, performance, and higher-level work.
+
+An unrelated Baz website request reached this session and was stopped at the user's correction.
+Its separate handoff is `../baz-website/BAZ-WEBSITE-HANDOFF.md`, commit `99729c3222cc4449a37f6a6b283b5b6f0cccc27a`.
+No Baz implementation, dependency change, remote, or publication was made by this session.
+Preserve both Baz worktrees and resume Baz only in its intended session.
+
+The historical checkpoints below describe their original revisions and retain their earlier scope.
+
 # Windows HTTP and platform documentation handoff — 2026-09-06
 
 The experimental Windows IOCP adapter is implemented and native x64 verification passed.

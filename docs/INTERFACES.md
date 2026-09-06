@@ -58,7 +58,7 @@ close is only after outstanding operations return. A busy cell yields
 Linux uses actual low-level io_uring accept/recv/send, runtime opcode probes,
 finite queues and explicit cancel drain. macOS uses nonblocking sockets/kqueue
 and the same completion interface.
-Windows uses overlapped `AcceptEx`, `WSARecv`, and `WSASend` through one completion port.
+Windows uses overlapped `AcceptEx`, `WSARecv`, and `WSASend` through one completion port per owner.
 IPv4 loopback binding initially; CLI can
 expose other bind addresses later. No per-operation allocation.
 
@@ -77,7 +77,15 @@ connections across them in the tested configuration. The M3 Max branch fixture
 observed every connection at the last-bound listener, so the current macOS
 configuration rejects multiple shards. That observation is not a universal
 XNU API guarantee.
-Windows requires one shard and exclusive listener binding.
+Windows uses exclusive listener binding with one accepting owner.
+`Backend.initAcceptor()` leaves accepted sockets unassociated after terminal accept collection.
+`Backend.initDestination()` creates an IOCP and fixed storage without a listener.
+`exportAccepted()` removes an unassociated socket with no outstanding operations from its source table.
+`importAccepted()` associates the socket with the destination IOCP and consumes ownership only on success.
+Failed imports leave the detached socket with the caller for closure or retry.
+`DetachedSocket.close()` closes and invalidates a detached handle.
+Zig does not make this type move-only; callers must preserve exclusive ownership explicitly.
+The cluster queue consumes the producer's optional value before release publication.
 Its cancellation acknowledgement never substitutes for the target operation's completion packet.
 The adapter keeps default completion notifications, including immediate-success packets.
 

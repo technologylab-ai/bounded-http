@@ -1,0 +1,50 @@
+{
+  "revision": "514c901fafd005f140a0a6fdf10ee28d0ff8796a",
+  "scope": "Clean pushed feature candidate native Linux regression; no timed comparison",
+  "started_utc": "2026-09-06T15:56:45.618606+00:00",
+  "finished_utc": "2026-09-06T15:57:29.940939+00:00",
+  "native_build_summaries": [
+    "82/84 tests passed (2 skipped)",
+    "82/84 tests passed (2 skipped)"
+  ],
+  "embedding_exact_responses_per_mode": 3,
+  "comparator_tests": 9,
+  "wire_passed": {
+    "bounded-http-gather-integration": 11,
+    "bounded-http-integration": 26,
+    "bounded-http-batch-integration": 29,
+    "bounded-http-inline-integration": 10,
+    "bounded-http-arena-lifecycle-integration": 8
+  },
+  "wire_total": 84,
+  "wire_sessions_with_zero_live_owners_and_late_allocations": 56,
+  "smoke_exact_bodies": 30000,
+  "release_safe_binary_sha256": "50b1f85d0cf058cb17fba8f6904a7bd1767505da0f9968fccf86e842d94ffff5",
+  "environment": {
+    "cpu": {
+      "logical_count": 8,
+      "model": "Intel(R) Core(TM) Ultra 7 258V",
+      "physical_count": null
+    },
+    "hostname": "omarx1",
+    "kernel_release": "7.1.9-arch1-2",
+    "kernel_version": "#1 SMP PREEMPT_DYNAMIC Fri, 21 Aug 2026 22:18:59 +0000",
+    "machine": "x86_64",
+    "network": "IPv4 TCP loopback; client and server share this host",
+    "physical_memory_bytes": 33101041664,
+    "platform": "Linux-7.1.9-arch1-2-x86_64-with-glibc2.44",
+    "python": "3.14.7",
+    "python_executable": "/usr/bin/python3",
+    "system": "Linux"
+  },
+  "compiler": {
+    "zig_exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+    "zig_sha256": "2317bbb91798556d9d0f38aabdac23db83f0979b25f767259ae474546724087c",
+    "zig_version": "0.16.0"
+  },
+  "all_tracked_hashes_unchanged": true,
+  "zero_owned_children_after_cleanup": true,
+  "host_reservation_released": true,
+  "remote_temporary_tree_removed": "/tmp/bounded-http.TdBvS6",
+  "linux_provenance_note": "The maintained wrapper streams a clean pushed tree without .git. Smoke commit/status fields are null; controller verifies pushed feature HEAD and tracked hashes before/after."
+}
