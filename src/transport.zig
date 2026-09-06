@@ -12,6 +12,8 @@ const std = @import("std");
 const builtin = @import("builtin");
 const c = std.c;
 
+/// POSIX descriptor, or a Windows backend-owned logical socket index.
+/// A Windows SOCKET handle is pointer-sized and never truncated into this value.
 pub const Socket = i32;
 pub const Completion = struct { token: u64, result: i32 };
 /// Kernel iovec limit for one sendmsg on Linux and macOS.
@@ -24,13 +26,27 @@ pub fn cellCount(max_connections: u16) usize {
 pub const Backend = switch (builtin.os.tag) {
     .linux => @import("transport_linux.zig").Backend,
     .macos => @import("transport_macos.zig").Backend,
-    else => @compileError("The experimental MVP transport supports Linux and macOS; Windows is pending."),
+    .windows => @import("transport_windows.zig").Backend,
+    else => @compileError("The experimental MVP transport supports Linux, macOS, and Windows."),
 };
 pub const name = switch (builtin.os.tag) {
     .linux => "io_uring",
     .macos => "kqueue",
+    .windows => "iocp",
     else => "unsupported",
 };
+
+/// Exact requested allocator bytes, excluding embedded Backend storage.
+pub fn backendHeapBytes(max_connections: u16) !usize {
+    if (builtin.os.tag == .windows) return Backend.heapBytes(max_connections);
+    return std.math.mul(usize, cellCount(max_connections), Backend.operation_bytes);
+}
+
+pub fn setSendBuffer(backend: *Backend, socket: Socket, bytes: u32) !void {
+    if (builtin.os.tag == .windows) return backend.setSendBuffer(socket, bytes);
+    const value: c_int = @intCast(bytes);
+    if (c.setsockopt(socket, c.SOL.SOCKET, c.SO.SNDBUF, &value, @sizeOf(c_int)) != 0) return error.SocketOptionFailed;
+}
 
 // Shared startup-only socket setup. The kernel listen backlog is separate from
 // framework connection admission; it cannot establish application admission.
@@ -133,6 +149,8 @@ test "accept cancellation drains target and cancellation acknowledgement separat
 }
 
 test "transport borrows receive and send buffers and accounts for EOF" {
+    // The Windows equivalent uses Winsock clients in transport_windows.zig.
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
     var backend = try Backend.init(std.testing.allocator, 2, 0, false);
     defer backend.deinit();
     try backend.enableGather();
@@ -232,6 +250,8 @@ test "cancellation cells are finite and returned completions replenish them" {
 }
 
 test "a startup worker can wake a waiting I/O owner" {
+    // The Windows equivalent uses Win32 clocks in transport_windows.zig.
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
     var backend = try Backend.init(std.testing.allocator, 1, 0, false);
     defer backend.deinit();
     const Worker = struct {
@@ -255,6 +275,10 @@ test "a startup worker can wake a waiting I/O owner" {
 }
 
 test "two reuse-port listeners share one loopback port" {
+    if (builtin.os.tag == .windows) {
+        try std.testing.expectError(error.ReusePortUnsupported, Backend.init(std.testing.allocator, 1, 0, true));
+        return;
+    }
     var first = try Backend.init(std.testing.allocator, 1, 0, true);
     defer first.deinit();
     var second = try Backend.init(std.testing.allocator, 1, first.port(), true);
