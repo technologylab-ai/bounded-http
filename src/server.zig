@@ -13,6 +13,9 @@ const win32 = struct {
 const assert = std.debug.assert;
 const transport = @import("transport.zig");
 const http = @import("http.zig");
+const HandoffSocket = if (builtin.os.tag == .windows) @import("transport_windows.zig").DetachedSocket else usize;
+const AcceptedSocket = struct { socket: HandoffSocket, accepted_at: u64 };
+const HandoffQueue = @import("handoff.zig").Queue(AcceptedSocket);
 pub const api = @import("api.zig");
 pub const Budget = @import("budget.zig").Budget;
 pub const backend_name = transport.name;
@@ -166,6 +169,12 @@ pub const Stats = struct {
     inline_dispatches: u64 = 0,
     worker_dispatches: u64 = 0,
     accepted: u64 = 0,
+    /// Socket metadata transfers between Windows owners; no request bytes move.
+    handoffs_sent: u64 = 0,
+    handoffs_received: u64 = 0,
+    /// Received queue entries closed before adoption succeeds.
+    handoffs_closed: u64 = 0,
+    max_handoff_delay_ns: u64 = 0,
     completed: u64 = 0,
     rejected: u64 = 0,
     timeouts: u64 = 0,
@@ -406,16 +415,29 @@ pub const Server = struct {
     date_second: u64 = std.math.maxInt(u64),
     /// Shared process-wide ceiling when running as a shard; null standalone.
     admission: ?*Admission = null,
+    /// Windows multi-shard distribution. Null preserves the direct accept path.
+    handoff_cluster: ?*Cluster = null,
+    shard_index: u8 = 0,
     /// Drains since the last explicit submission within the current turn.
     drains_since_flush: u16 = 0,
 
     const clock_refresh_callbacks: u32 = 16;
 
     pub fn init(allocator: std.mem.Allocator, config: Config, handler: api.Handler, application: ?*anyopaque) !*Server {
+        return initWith(allocator, config, handler, application, .direct);
+    }
+
+    const AcceptMode = enum { direct, distribute, receive };
+
+    fn initWith(allocator: std.mem.Allocator, config: Config, handler: api.Handler, application: ?*anyopaque, accept_mode: AcceptMode) !*Server {
         try config.validate();
         const self = try allocator.create(Server);
         errdefer allocator.destroy(self);
-        var backend = try transport.Backend.init(allocator, config.connections, config.port, config.reuse_port);
+        var backend = if (builtin.os.tag == .windows) switch (accept_mode) {
+            .direct => try transport.Backend.init(allocator, config.connections, config.port, config.reuse_port),
+            .distribute => try transport.Backend.initAcceptor(allocator, config.connections, config.port),
+            .receive => try transport.Backend.initDestination(allocator, config.connections),
+        } else try transport.Backend.init(allocator, config.connections, config.port, config.reuse_port);
         errdefer backend.deinit();
         if (config.gather_send) try backend.enableGather();
         const slots = try allocator.alloc(Slot, config.connections);
@@ -572,6 +594,16 @@ pub const Server = struct {
 
     pub fn run(self: *Server) !void {
         assert(self.started);
+        // Completion means no further queue publication, including on error.
+        // A failed backend still retains its operation storage until process exit.
+        defer if (builtin.os.tag == .windows) {
+            if (self.handoff_cluster) |cluster| {
+                if (self.shard_index == 0) {
+                    cluster.producer_done.store(true, .release);
+                    for (cluster.shards[1..]) |server| server.backend.wake();
+                }
+            }
+        };
         var completions: [512]transport.Completion = undefined;
         const sweep_ns = @as(u64, self.config.deadline_sweep_ms) * 1_000_000;
         while (true) {
@@ -585,6 +617,10 @@ pub const Server = struct {
             if (self.stop_requested.load(.acquire) and !self.stopping) {
                 self.stopping = true;
                 self.stop_deadline = turn_start + @as(u64, self.config.shutdown_ms) * 1_000_000;
+                // A receiver must stop the producer before waiting for its end.
+                if (builtin.os.tag == .windows) {
+                    if (self.handoff_cluster) |cluster| cluster.requestStop();
+                }
             }
             if (self.stopping and self.accept_pending and !self.accept_cancel_requested) {
                 try self.backend.cancel(self.cancelAcceptCell(), cancel_accept_token, self.acceptCell());
@@ -592,11 +628,13 @@ pub const Server = struct {
                 self.accept_cancel_requested = true;
                 self.operationAdded();
             }
-            if (!self.stopping and !self.accept_pending) {
+            const accepts = builtin.os.tag != .windows or self.handoff_cluster == null or self.shard_index == 0;
+            if (accepts and !self.stopping and !self.accept_pending) {
                 try self.backend.accept(self.acceptCell(), accept_token);
                 self.accept_pending = true;
                 self.operationAdded();
             }
+            try self.receiveHandoffs();
             self.refreshDate();
             if (self.stopping or turn_start - self.last_sweep >= sweep_ns) {
                 self.last_sweep = turn_start;
@@ -626,9 +664,9 @@ pub const Server = struct {
             const control_ns = nowNs() - turn_start;
             self.stats.max_loop_ns = @max(self.stats.max_loop_ns, control_ns);
             if (self.stopping and self.stats.live_connections == 0 and
-                self.stats.live_operations == 0) break;
+                self.stats.live_operations == 0 and self.handoffsFinished()) break;
             if (self.stopping and self.now >= self.stop_deadline) return error.ShutdownStalled;
-            const local_ready = self.ready_count > 0 or (self.config.execution == .workers and self.anyResult());
+            const local_ready = self.ready_count > 0 or (self.config.execution == .workers and self.anyResult()) or self.handoffsReady();
             self.stats.turns += 1;
             const count = try self.backend.poll(&completions, if (local_ready) 0 else 10);
             if (count == 0 and !local_ready) self.stats.idle_polls += 1;
@@ -732,6 +770,137 @@ pub const Server = struct {
         return (@as(u64, slot.generation) << 32) | (@as(u64, index) << 8) | @intFromEnum(kind);
     }
 
+    fn distributeAccepted(self: *Server, socket: transport.Socket) !void {
+        if (builtin.os.tag != .windows) unreachable;
+        const cluster = self.handoff_cluster.?;
+        assert(self.shard_index == 0 and !cluster.producer_done.load(.monotonic));
+        if (self.stop_requested.load(.acquire) or !cluster.admission.admit()) {
+            self.backend.close(self.acceptCell(), socket);
+            if (!self.stop_requested.load(.acquire)) self.stats.rejected += 1;
+            return;
+        }
+        var value: ?AcceptedSocket = .{
+            .socket = self.backend.exportAccepted(socket) catch |err| {
+                self.backend.close(self.acceptCell(), socket);
+                cluster.admission.release();
+                return err;
+            },
+            .accepted_at = self.now,
+        };
+        const destination = cluster.next_destination;
+        cluster.next_destination = (destination + 1) % cluster.shards.len;
+        if (destination == 0) {
+            try self.adoptHandoff(&value.?);
+            value = null;
+            return;
+        }
+        // The new admission charge proves fewer than C earlier items remain
+        // anywhere in the cluster. A queue with capacity C must have room.
+        const published = cluster.handoffs[destination - 1].push(&value);
+        assert(published and value == null);
+        self.stats.handoffs_sent += 1;
+        cluster.shards[destination].backend.wake();
+    }
+
+    fn adoptHandoff(self: *Server, value: *AcceptedSocket) !void {
+        if (builtin.os.tag != .windows) unreachable;
+        const cluster = self.handoff_cluster.?;
+        assert(self.free_count > 0);
+        // Refresh once per adoption, including during a full queue drain.
+        // Request callbacks continue to use the existing turn-clock policy.
+        self.sampleClock();
+        const deadline = value.accepted_at + @as(u64, self.config.timeout_ms) * 1_000_000;
+        self.stats.max_handoff_delay_ns = @max(self.stats.max_handoff_delay_ns, self.now - value.accepted_at);
+        if (self.stop_requested.load(.acquire) or self.now >= deadline) {
+            value.socket.close();
+            cluster.admission.release();
+            if (self.shard_index != 0) self.stats.handoffs_closed += 1;
+            if (!self.stop_requested.load(.acquire)) self.stats.timeouts += 1;
+            return;
+        }
+        const socket = self.backend.importAccepted(&value.socket) catch {
+            // Association failure preserves the detached handle for closure.
+            value.socket.close();
+            cluster.admission.release();
+            if (self.shard_index != 0) self.stats.handoffs_closed += 1;
+            self.stats.rejected += 1;
+            return;
+        };
+        if (!try self.adoptSocket(socket, value.accepted_at) and self.shard_index != 0) self.stats.handoffs_closed += 1;
+    }
+
+    fn receiveHandoffs(self: *Server) !void {
+        if (builtin.os.tag != .windows) return;
+        const cluster = self.handoff_cluster orelse return;
+        if (self.shard_index == 0) return;
+        const queue = &cluster.handoffs[self.shard_index - 1];
+        // A producer can refill while we drain. Cap work at C per loop turn.
+        for (0..self.config.connections) |_| {
+            var value = queue.pop() orelse break;
+            self.stats.handoffs_received += 1;
+            try self.adoptHandoff(&value);
+        }
+    }
+
+    fn handoffsFinished(self: *Server) bool {
+        if (builtin.os.tag != .windows) return true;
+        const cluster = self.handoff_cluster orelse return true;
+        if (self.shard_index == 0) return true;
+        // Completion must be acquired BEFORE the final empty observation.
+        // Otherwise a final publication could fall between the two reads.
+        if (!cluster.producer_done.load(.acquire)) return false;
+        return cluster.handoffs[self.shard_index - 1].empty();
+    }
+
+    fn handoffsReady(self: *Server) bool {
+        if (builtin.os.tag != .windows) return false;
+        const cluster = self.handoff_cluster orelse return false;
+        if (self.shard_index == 0) return false;
+        return !cluster.handoffs[self.shard_index - 1].empty();
+    }
+
+    /// The caller already owns any shared admission charge.
+    fn adoptSocket(self: *Server, socket: transport.Socket, accepted_at: u64) !bool {
+        assert(self.free_count > 0);
+        const index = self.free_slots[self.free_count - 1];
+        const slot = &self.slots[index];
+        assert(!slot.in_use and slot.phase.load(.acquire) == .io);
+        slot.generation = try std.math.add(u32, slot.generation, 1);
+        slot.fd = socket;
+        transport.setSendBuffer(&self.backend, slot.fd, self.config.socket_send_buffer_bytes) catch {
+            self.backend.close(self.acceptCell(), slot.fd);
+            slot.fd = -1;
+            self.stats.rejected += 1;
+            if (self.admission) |admission| admission.release();
+            return false;
+        };
+        self.free_count -= 1;
+        slot.in_use = true;
+        slot.closing = false;
+        slot.cancelled.store(false, .release);
+        slot.received = 0;
+        slot.recv_eof = false;
+        slot.input_cursor = 0;
+        slot.request_active = false;
+        slot.batch_count = 0;
+        slot.arena_used = 0;
+        slot.batch_borrows_input = false;
+        slot.part_count = 0;
+        slot.part = 0;
+        slot.part_offset = 0;
+        slot.parser.reset();
+        slot.interim_sent = false;
+        slot.logical_written = 0;
+        slot.deadline = accepted_at + @as(u64, self.config.timeout_ms) * 1_000_000;
+        slot.request_started = accepted_at;
+        self.stats.accepted += 1;
+        self.stats.live_connections += 1;
+        self.stats.peak_connections = @max(self.stats.peak_connections, self.stats.live_connections);
+        assert(self.stats.live_connections <= self.slots.len);
+        try self.receive(index);
+        return true;
+    }
+
     fn onCompletion(self: *Server, completion: transport.Completion) !void {
         assert(self.stats.live_operations > 0);
         self.stats.live_operations -= 1;
@@ -745,6 +914,10 @@ pub const Server = struct {
             assert(self.accept_pending);
             self.accept_pending = false;
             if (completion.result < 0) return;
+            if (builtin.os.tag == .windows and self.handoff_cluster != null) {
+                try self.distributeAccepted(completion.result);
+                return;
+            }
             if (self.stopping or self.free_count == 0) {
                 if (!self.stopping) self.stats.rejected += 1;
                 self.backend.close(self.acceptCell(), completion.result);
@@ -757,42 +930,7 @@ pub const Server = struct {
                     return;
                 }
             }
-            const index = self.free_slots[self.free_count - 1];
-            const slot = &self.slots[index];
-            assert(!slot.in_use and slot.phase.load(.acquire) == .io);
-            slot.generation = try std.math.add(u32, slot.generation, 1);
-            slot.fd = completion.result;
-            transport.setSendBuffer(&self.backend, slot.fd, self.config.socket_send_buffer_bytes) catch {
-                self.backend.close(self.acceptCell(), slot.fd);
-                slot.fd = -1;
-                self.stats.rejected += 1;
-                if (self.admission) |admission| admission.release();
-                return;
-            };
-            self.free_count -= 1;
-            slot.in_use = true;
-            slot.closing = false;
-            slot.cancelled.store(false, .release);
-            slot.received = 0;
-            slot.recv_eof = false;
-            slot.input_cursor = 0;
-            slot.request_active = false;
-            slot.batch_count = 0;
-            slot.arena_used = 0;
-            slot.batch_borrows_input = false;
-            slot.part_count = 0;
-            slot.part = 0;
-            slot.part_offset = 0;
-            slot.parser.reset();
-            slot.interim_sent = false;
-            slot.logical_written = 0;
-            slot.deadline = self.now + @as(u64, self.config.timeout_ms) * 1_000_000;
-            slot.request_started = self.now;
-            self.stats.accepted += 1;
-            self.stats.live_connections += 1;
-            self.stats.peak_connections = @max(self.stats.peak_connections, self.stats.live_connections);
-            assert(self.stats.live_connections <= self.slots.len);
-            try self.receive(index);
+            _ = try self.adoptSocket(completion.result, self.now);
             return;
         }
         const index: usize = @intCast((completion.token >> 8) & 0xffff);
@@ -1525,11 +1663,22 @@ pub const Admission = struct {
 
     /// Reserve one connection; false when the ceiling is already reached.
     pub fn admit(self: *Admission) bool {
-        const before = self.live.fetchAdd(1, .acq_rel);
-        if (before >= self.limit) {
-            _ = self.live.fetchSub(1, .acq_rel);
+        const before = if (builtin.os.tag == .windows) bounded: {
+            // Queue and transit charges share this counter. A failed Windows
+            // reservation never raises the observed counter above the limit.
+            var live = self.live.load(.acquire);
+            while (live < self.limit) {
+                live = self.live.cmpxchgWeak(live, live + 1, .acq_rel, .acquire) orelse break :bounded live;
+            }
             return false;
-        }
+        } else direct: {
+            const live = self.live.fetchAdd(1, .acq_rel);
+            if (live >= self.limit) {
+                _ = self.live.fetchSub(1, .acq_rel);
+                return false;
+            }
+            break :direct live;
+        };
         const now_live = before + 1;
         var peak = self.peak.load(.monotonic);
         while (peak < now_live) {
@@ -1545,11 +1694,12 @@ pub const Admission = struct {
 };
 
 /// Several independent I/O owners on one port. Each shard is a complete
-/// Server with its own listener (SO_REUSEPORT), transport, slots, arenas and
-/// counters; they share admission, stop coordination and the application
-/// pointer. Shard 0 runs on the calling thread, the others on startup-spawned
-/// threads with fixed stacks. Linux
-/// distributes connections across the listeners; macOS keeps one shard.
+/// Server with its own transport, slots, arenas and counters. Linux uses one
+/// SO_REUSEPORT listener per owner. Windows transfers unassociated sockets
+/// from shard 0's listener through fixed queues. Owners share admission and the
+/// application pointer, with coordinated stop and queue publication barriers.
+/// Shard 0 runs on the calling thread, the others on startup-spawned threads
+/// with fixed stacks. macOS keeps one shard.
 pub const Cluster = struct {
     allocator: std.mem.Allocator,
     config: Config,
@@ -1563,6 +1713,12 @@ pub const Cluster = struct {
     gate: std.atomic.Value(Gate) = .init(.waiting),
     prepared: std.atomic.Value(u32) = .init(0),
     exited: std.atomic.Value(u32) = .init(0),
+    handoffs: []HandoffQueue = &.{},
+    handoff_storage: []?AcceptedSocket = &.{},
+    /// Only the accepting owner changes the destination cursor.
+    next_destination: usize = 0,
+    /// No more publications; an errored producer may still retain kernel loans.
+    producer_done: std.atomic.Value(bool) = .init(false),
 
     const Gate = enum(u8) { waiting, run, abort };
     const NativeLifecycle = struct {
@@ -1599,7 +1755,7 @@ pub const Cluster = struct {
         var shard = config;
         shard.shards = shards;
         shard.port = port_number;
-        shard.reuse_port = shards > 1;
+        shard.reuse_port = shards > 1 and builtin.os.tag == .linux;
         // Stacks for the other shards are reserved by the cluster, not per shard.
         shard.memory_budget_bytes = std.math.maxInt(usize);
         return shard;
@@ -1613,7 +1769,7 @@ pub const Cluster = struct {
         // XNU delivers every connection to the most recently bound reuse-port
         // listener (observed 2026-09-05), so extra macOS shards only shrink
         // admission. Distribution needs an acceptor mailbox there; not built.
-        if (shards > 1 and @import("builtin").os.tag != .linux) return error.InvalidConfiguration;
+        if (shards > 1 and builtin.os.tag != .linux and builtin.os.tag != .windows) return error.InvalidConfiguration;
         if (try std.math.add(usize, try heapBytes(config), try stackBytes(config)) > config.memory_budget_bytes)
             return error.MemoryBudgetExceeded;
     }
@@ -1625,6 +1781,10 @@ pub const Cluster = struct {
         var heap: usize = @sizeOf(Cluster);
         const coordinator_per_shard = @sizeOf(*Server) + @sizeOf(?std.Thread) + @sizeOf(?anyerror);
         heap = try std.math.add(usize, heap, try std.math.mul(usize, shards, coordinator_per_shard));
+        const queues = handoffCount(shards);
+        heap = try std.math.add(usize, heap, try std.math.mul(usize, queues, @sizeOf(HandoffQueue)));
+        const entries = try std.math.mul(usize, queues, @as(usize, config.connections) + 1);
+        heap = try std.math.add(usize, heap, try std.math.mul(usize, entries, @sizeOf(?AcceptedSocket)));
         for (0..shards) |index| heap = try std.math.add(usize, heap, try shardConfig(config, shards, @intCast(index), config.port).heapBytes());
         return heap;
     }
@@ -1634,6 +1794,10 @@ pub const Cluster = struct {
     pub fn stackBytes(config: Config) !usize {
         const count = try std.math.add(usize, config.workers, resolveShards(config) - 1);
         return std.math.mul(usize, config.worker_stack_bytes, count);
+    }
+
+    fn handoffCount(shards: u8) usize {
+        return if (builtin.os.tag == .windows and shards > 1) shards - 1 else 0;
     }
 
     pub fn init(allocator: std.mem.Allocator, config: Config, handler: api.Handler, application: ?*anyopaque) !*Cluster {
@@ -1647,21 +1811,32 @@ pub const Cluster = struct {
         errdefer allocator.free(threads);
         const failures = try allocator.alloc(?anyerror, shards);
         errdefer allocator.free(failures);
+        const handoffs = try allocator.alloc(HandoffQueue, handoffCount(shards));
+        errdefer allocator.free(handoffs);
+        const entries_per_queue = @as(usize, config.connections) + 1;
+        const handoff_storage = try allocator.alloc(?AcceptedSocket, handoffs.len * entries_per_queue);
+        errdefer allocator.free(handoff_storage);
+        for (handoffs, 0..) |*queue, index| queue.* = HandoffQueue.init(handoff_storage[index * entries_per_queue ..][0..entries_per_queue]);
         @memset(threads, null);
         @memset(failures, null);
         var created: usize = 0;
         errdefer for (servers[0..created]) |server| server.deinit();
         var port_number = config.port;
         for (servers, 0..) |*server, index| {
-            server.* = try Server.init(allocator, shardConfig(config, shards, @intCast(index), port_number), handler, application);
+            const mode: Server.AcceptMode = if (handoffs.len == 0) .direct else if (index == 0) .distribute else .receive;
+            server.* = try Server.initWith(allocator, shardConfig(config, shards, @intCast(index), port_number), handler, application, mode);
             created += 1;
             // A port chosen by the OS for the first shard binds every other one.
             if (index == 0) port_number = server.*.backend.port();
         }
-        self.* = .{ .allocator = allocator, .config = config, .shards = servers, .threads = threads, .failures = failures, .admission = .{ .limit = config.connections }, .port_number = port_number };
+        self.* = .{ .allocator = allocator, .config = config, .shards = servers, .threads = threads, .failures = failures, .admission = .{ .limit = config.connections }, .port_number = port_number, .handoffs = handoffs, .handoff_storage = handoff_storage };
         // Standalone servers admit by their own slots; shards share one ceiling.
         if (shards > 1) for (servers) |server| {
             server.admission = &self.admission;
+        };
+        if (handoffs.len > 0) for (servers, 0..) |server, index| {
+            server.handoff_cluster = self;
+            server.shard_index = @intCast(index);
         };
         return self;
     }
@@ -1822,8 +1997,12 @@ pub const Cluster = struct {
 
     pub fn deinit(self: *Cluster) void {
         for (self.threads) |thread| assert(thread == null);
+        for (self.handoffs) |*queue| assert(queue.empty());
+        assert(self.admission.live.load(.acquire) == 0);
         for (self.shards) |server| server.deinit();
         const allocator = self.allocator;
+        allocator.free(self.handoff_storage);
+        allocator.free(self.handoffs);
         allocator.free(self.failures);
         allocator.free(self.threads);
         allocator.free(self.shards);
@@ -2070,7 +2249,8 @@ test "cluster reserves full shard capacity and rejects unsupported topologies" {
     // Every shard keeps full capacity; the shared Admission enforces the total.
     try std.testing.expectEqual(@as(u16, 128), first.connections);
     try std.testing.expectEqual(@as(u16, 128), last.connections);
-    try std.testing.expect(first.reuse_port and last.reuse_port);
+    try std.testing.expectEqual(builtin.os.tag == .linux, first.reuse_port);
+    try std.testing.expectEqual(builtin.os.tag == .linux, last.reuse_port);
     try std.testing.expectEqual(@as(u16, 9000), last.port);
     try std.testing.expect(!Cluster.shardConfig(config, 1, 0, 1).reuse_port);
     var admission: Admission = .{ .limit = 2 };
@@ -2080,13 +2260,11 @@ test "cluster reserves full shard capacity and rejects unsupported topologies" {
     try std.testing.expectEqual(@as(u32, 2), admission.peak.load(.acquire));
     try std.testing.expectError(error.InvalidConfiguration, Cluster.validate(.{ .shards = 65 }));
     try std.testing.expectError(error.InvalidConfiguration, Cluster.validate(.{ .execution = .workers, .workers = 2, .shards = 2 }));
-    if (@import("builtin").os.tag != .linux) {
-        try std.testing.expectEqual(@as(u8, 1), Cluster.resolveShards(.{}));
-        try std.testing.expectError(error.InvalidConfiguration, Cluster.validate(.{ .shards = 2 }));
-    } else {
+    if (builtin.os.tag != .linux) try std.testing.expectEqual(@as(u8, 1), Cluster.resolveShards(.{}));
+    if (builtin.os.tag == .linux or builtin.os.tag == .windows) {
         try std.testing.expect(Cluster.resolveShards(.{}) >= 1);
         try Cluster.validate(.{ .shards = 2 });
-    }
+    } else try std.testing.expectError(error.InvalidConfiguration, Cluster.validate(.{ .shards = 2 }));
     const single = try Cluster.init(std.testing.allocator, .{ .connections = 2, .port = 0, .shards = 1 }, struct {
         fn handle(_: *api.Context) api.Action {
             unreachable;
@@ -2126,7 +2304,7 @@ test "cluster exact heap and stack budget includes coordinator and shard arrays"
         .{ .connections = 2, .port = 0, .shards = 3, .response_batch_limit = 2 },
     };
     for (configs) |initial| {
-        if (initial.shards > 1 and @import("builtin").os.tag != .linux) continue;
+        if (initial.shards > 1 and builtin.os.tag != .linux and builtin.os.tag != .windows) continue;
         var config = initial;
         const heap = try Cluster.heapBytes(config);
         const stacks = try Cluster.stackBytes(config);
@@ -2160,7 +2338,7 @@ test "cluster exact heap and stack budget includes coordinator and shard arrays"
 }
 
 test "cluster partial spawn failure aborts prepared owners before request I/O" {
-    if (@import("builtin").os.tag != .linux) return error.SkipZigTest;
+    if (builtin.os.tag != .linux and builtin.os.tag != .windows) return error.SkipZigTest;
     const Lifecycle = struct {
         fn beforeSpawn(cluster: *Cluster, index: usize) !void {
             if (index != 2) return;
@@ -2208,7 +2386,7 @@ test "cluster partial spawn failure aborts prepared owners before request I/O" {
 }
 
 test "secondary shard error stops the primary without a duration escape" {
-    if (@import("builtin").os.tag != .linux) return error.SkipZigTest;
+    if (builtin.os.tag != .linux and builtin.os.tag != .windows) return error.SkipZigTest;
     const Lifecycle = struct {
         var primary_entered: std.atomic.Value(bool) = .init(false);
         fn beforeSpawn(_: *Cluster, _: usize) !void {}
@@ -2258,6 +2436,132 @@ test "secondary shard error stops the primary without a duration escape" {
         try std.testing.expect(server.safe_to_destroy);
         try std.testing.expectEqual(@as(usize, 0), server.stats.live_connections);
         try std.testing.expectEqual(@as(usize, 0), server.stats.live_operations);
+    }
+}
+
+/// Fixtures explicitly hold the startup gate while preparing accepted sockets.
+/// Production startup never submits request operations before that gate opens.
+const WindowsHandoffFixture = struct {
+    const ws = std.os.windows.ws2_32;
+    extern "ws2_32" fn WSASocketW(i32, i32, i32, ?*anyopaque, u32, u32) callconv(.winapi) usize;
+    extern "ws2_32" fn connect(usize, *const ws.sockaddr, i32) callconv(.winapi) i32;
+    extern "ws2_32" fn closesocket(usize) callconv(.winapi) i32;
+
+    fn enqueue(cluster: *Cluster, destination: usize, age_ns: u64) !usize {
+        assert(cluster.started and cluster.gate.load(.acquire) == .waiting);
+        assert(destination > 0 and destination < cluster.shards.len);
+        const source = cluster.shards[0];
+        cluster.next_destination = destination;
+        const client = WSASocketW(ws.AF.INET, ws.SOCK.STREAM, ws.IPPROTO.TCP, null, 0, 1 | 0x80);
+        if (client == std.math.maxInt(usize)) return error.FixtureSocketFailed;
+        errdefer assert(closesocket(client) == 0);
+        var address: ws.sockaddr.in = .{ .port = std.mem.nativeToBig(u16, cluster.port()), .addr = std.mem.nativeToBig(u32, 0x7f000001) };
+        if (connect(client, @ptrCast(&address), @sizeOf(@TypeOf(address))) != 0) return error.FixtureConnectFailed;
+        try source.backend.accept(source.acceptCell(), accept_token);
+        source.accept_pending = true;
+        source.operationAdded();
+        var completion: [1]transport.Completion = undefined;
+        const deadline = nowNs() + 3_000_000_000;
+        while (nowNs() < deadline) {
+            if (try source.backend.poll(&completion, 10) == 0) continue;
+            try std.testing.expectEqual(accept_token, completion[0].token);
+            try std.testing.expect(completion[0].result >= 0);
+            source.now = nowNs() - age_ns;
+            try source.onCompletion(completion[0]);
+            return client;
+        }
+        return error.FixtureAcceptDeadline;
+    }
+
+    fn noRequest(_: *api.Context) api.Action {
+        @panic("a queued handoff fixture must not dispatch application code");
+    }
+};
+
+test "Windows queued sockets retain global admission and a receiver stop drains every owner" {
+    if (builtin.os.tag != .windows) return error.SkipZigTest;
+    var watchdog: ClusterTestWatchdog = .{};
+    const watcher = try std.Thread.spawn(.{}, ClusterTestWatchdog.run, .{&watchdog});
+    defer {
+        watchdog.done.store(true, .release);
+        watcher.join();
+    }
+    const config: Config = .{ .connections = 2, .shards = 3, .port = 0, .response_batch_limit = 2, .shutdown_ms = 1000 };
+    var budget: Budget = .{ .upstream = std.testing.allocator, .limit_bytes = try Cluster.heapBytes(config) };
+    const cluster = try Cluster.init(budget.allocator(), config, WindowsHandoffFixture.noRequest, null);
+    defer cluster.deinit();
+    try cluster.start();
+    budget.sealed.store(true, .release);
+    const first = try WindowsHandoffFixture.enqueue(cluster, 1, 0);
+    defer assert(WindowsHandoffFixture.closesocket(first) == 0);
+    const second = try WindowsHandoffFixture.enqueue(cluster, 2, 0);
+    defer assert(WindowsHandoffFixture.closesocket(second) == 0);
+    try std.testing.expectEqual(@as(u32, 2), cluster.admission.live.load(.acquire));
+    try std.testing.expect(!cluster.admission.admit());
+    const refused = try WindowsHandoffFixture.enqueue(cluster, 1, 0);
+    defer assert(WindowsHandoffFixture.closesocket(refused) == 0);
+    try std.testing.expectEqual(@as(u64, 1), cluster.shards[0].stats.rejected);
+    try std.testing.expectEqual(@as(u64, 2), cluster.shards[0].stats.handoffs_sent);
+    try std.testing.expectEqual(@as(u32, 2), cluster.admission.live.load(.acquire));
+    try std.testing.expectEqual(@as(usize, 0), cluster.shards[0].backend.socket_count);
+    for (cluster.shards) |server| try std.testing.expectEqual(@as(u64, 0), server.stats.accepted);
+    // Only a receiver sees the initial stop. The receiver must stop shard 0
+    // before waiting for the publication barrier, or this run cannot finish.
+    cluster.shards[1].requestStop();
+    try cluster.run();
+    const stats = cluster.stats();
+    try std.testing.expectEqual(@as(u64, 2), stats.handoffs_sent);
+    try std.testing.expectEqual(@as(u64, 2), stats.handoffs_received);
+    // Another owner may adopt before observing propagated stop. Every charge
+    // still drains, without assuming a particular cross-thread schedule.
+    try std.testing.expect(stats.handoffs_closed >= 1);
+    try std.testing.expectEqual(@as(usize, 0), stats.live_connections);
+    try std.testing.expectEqual(@as(usize, 0), stats.live_operations);
+    try std.testing.expect(cluster.producer_done.load(.acquire));
+    try std.testing.expectEqual(@as(usize, 0), budget.late_calls.load(.acquire));
+}
+
+test "Windows handoff preserves acceptance deadline and expires queued sockets without dispatch" {
+    if (builtin.os.tag != .windows) return error.SkipZigTest;
+    var watchdog: ClusterTestWatchdog = .{};
+    const watcher = try std.Thread.spawn(.{}, ClusterTestWatchdog.run, .{&watchdog});
+    defer {
+        watchdog.done.store(true, .release);
+        watcher.join();
+    }
+    for ([_]bool{ false, true }) |expired| {
+        const cluster = try Cluster.init(std.testing.allocator, .{
+            .connections = 1,
+            .shards = 2,
+            .port = 0,
+            .response_batch_limit = 2,
+            .timeout_ms = 1000,
+            .shutdown_ms = 1000,
+        }, WindowsHandoffFixture.noRequest, null);
+        defer cluster.deinit();
+        try cluster.start();
+        const source = cluster.shards[0];
+        const destination = cluster.shards[1];
+        const client = try WindowsHandoffFixture.enqueue(cluster, 1, if (expired) 2_000_000_000 else 0);
+        const accepted_at = source.now;
+        defer assert(WindowsHandoffFixture.closesocket(client) == 0);
+        destination.sampleClock();
+        try destination.receiveHandoffs();
+        if (expired) {
+            try std.testing.expectEqual(@as(u64, 1), destination.stats.handoffs_closed);
+            try std.testing.expectEqual(@as(u64, 1), destination.stats.timeouts);
+            try std.testing.expectEqual(@as(usize, 0), destination.stats.live_operations);
+            try std.testing.expectEqual(@as(u32, 0), cluster.admission.live.load(.acquire));
+        } else {
+            try std.testing.expectEqual(accepted_at + 1_000_000_000, destination.slots[0].deadline);
+            try std.testing.expectEqual(accepted_at, destination.slots[0].request_started);
+            try std.testing.expectEqual(@as(usize, 1), destination.stats.live_operations);
+            try std.testing.expectEqual(@as(u32, 1), cluster.admission.live.load(.acquire));
+        }
+        cluster.requestStop();
+        try cluster.run();
+        try std.testing.expectEqual(@as(usize, 0), cluster.stats().live_connections);
+        try std.testing.expectEqual(@as(usize, 0), cluster.stats().live_operations);
     }
 }
 

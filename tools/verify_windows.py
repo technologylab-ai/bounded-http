@@ -48,7 +48,7 @@ def main():
                    execution='native x64 Windows compiler and HTTP executable',
                    timed_comparison=False, phases=[],
                    exclusions=['Four batch maximum-cell fixtures need POSIX SIGSTOP/SIGCONT',
-                               'Linux-only shard fixtures remain explicit skips',
+                               'POSIX-only transport fixtures remain explicit skips',
                                'CTRL_BREAK shutdown only; console-close, logoff and service control remain unqualified',
                                'No ARM64, WOW64, device, production-load or latency qualification'])
     environment = dict(os.environ, PYTHONDONTWRITEBYTECODE='1',
@@ -122,6 +122,14 @@ def main():
                        '--timeout', '120', '--json', str(packet / (name + '.json'))], 150)
             wire = json.loads((packet / (name + '.json')).read_text())
             require(wire.get('ok') is True, name + ' did not produce a passing receipt')
+        run('windows-shards-integration',
+            [sys.executable, 'tests/windows_shards_integration.py', '--server', str(binary),
+             '--timeout', '120', '--json', str(packet / 'windows-shards-integration.json')], 150)
+        shards = json.loads((packet / 'windows-shards-integration.json').read_text())
+        require(shards.get('ok') is True and shards.get('passed') == 9,
+                'Native Windows multi-owner receipt mismatch')
+        require(all(session['backend'] == 'iocp' and session['stats']['shards'] >= 2
+                    for session in shards['sessions']), 'Multi-owner suite did not run native IOCP shards')
         run('smoke', [sys.executable, 'tools/smoke.py', '--server', str(binary), '--timeout', '150',
                       '--json', str(packet / 'smoke.json')], 180)
         smoke = json.loads((packet / 'smoke.json').read_text())

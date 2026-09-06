@@ -106,7 +106,21 @@ fn negative(code: u32) i32 {
     return -@as(i32, @intFromEnum(err));
 }
 
+/// One unassociated socket, after its AcceptEx completion was collected.
+/// Queue publication transfers ownership; the producer must invalidate its copy.
+/// Import consumes this value on success. Failure leaves ownership with the caller.
+/// Drain every detached socket before the last backend releases Winsock startup.
+pub const DetachedSocket = struct {
+    handle: usize = invalid_socket,
+
+    pub fn close(self: *DetachedSocket) void {
+        closeSocket(self.handle);
+        self.* = .{};
+    }
+};
+
 pub const Backend = struct {
+    const Mode = enum { direct, acceptor, destination };
     const Kind = enum { free, accept, recv, send, sendv, cancel };
     const Operation = struct {
         overlapped: Overlapped = .{},
@@ -121,7 +135,13 @@ pub const Backend = struct {
         vectors: []const std.c.iovec_const = &.{},
         addresses: [2 * address_bytes]u8 = undefined,
     };
-    const SocketEntry = struct { handle: usize = invalid_socket, owned: u32 = 0, next: ?u32 = null };
+    const SocketEntry = struct {
+        handle: usize = invalid_socket,
+        owned: u32 = 0,
+        next: ?u32 = null,
+        associated: bool = false,
+        exportable: bool = false,
+    };
     pub const operation_bytes = @sizeOf(Operation) + @sizeOf(u32);
 
     allocator: std.mem.Allocator,
@@ -133,10 +153,11 @@ pub const Backend = struct {
     free_socket: ?u32,
     socket_count: usize = 0,
     outstanding: usize = 0,
-    listener: usize,
+    listener: usize = invalid_socket,
     queue: windows.HANDLE,
-    accept_ex: AcceptEx,
-    bound_port: u16,
+    accept_ex: ?AcceptEx = null,
+    bound_port: u16 = 0,
+    handoff_accepts: bool = false,
     gather_enabled: bool = false,
     wake_pending: std.atomic.Value(bool) = .init(false),
     poll_failed: bool = false,
@@ -150,8 +171,22 @@ pub const Backend = struct {
     }
 
     pub fn init(allocator: std.mem.Allocator, max_connections: u16, port_number: u16, reuse_port: bool) !Backend {
-        if (max_connections == 0 or max_connections > 16383) return error.InvalidConnectionLimit;
         if (reuse_port) return error.ReusePortUnsupported;
+        return initMode(allocator, max_connections, port_number, .direct);
+    }
+
+    /// The listener owns acceptance. The collected socket awaits its first association.
+    pub fn initAcceptor(allocator: std.mem.Allocator, max_connections: u16, port_number: u16) !Backend {
+        return initMode(allocator, max_connections, port_number, .acceptor);
+    }
+
+    /// Creates a destination port without binding or opening a listener socket.
+    pub fn initDestination(allocator: std.mem.Allocator, max_connections: u16) !Backend {
+        return initMode(allocator, max_connections, 0, .destination);
+    }
+
+    fn initMode(allocator: std.mem.Allocator, max_connections: u16, port_number: u16, mode: Mode) !Backend {
+        if (max_connections == 0 or max_connections > 16383) return error.InvalidConnectionLimit;
         var wsa_data: WsaData = undefined;
         if (win32.WSAStartup(0x0202, &wsa_data) != 0) return error.WinsockStartupFailed;
         errdefer assert(win32.WSACleanup() == 0);
@@ -164,6 +199,16 @@ pub const Backend = struct {
         const sockets = try allocator.alloc(SocketEntry, @as(usize, max_connections) + 1);
         errdefer allocator.free(sockets);
         for (sockets, 0..) |*entry, index| entry.* = .{ .next = if (index + 1 < sockets.len) @intCast(index + 1) else null };
+        const queue = win32.CreateIoCompletionPort(@ptrFromInt(invalid_socket), null, 0, 1) orelse return error.IocpCreateFailed;
+        errdefer windows.CloseHandle(queue);
+        if (mode == .destination) return .{
+            .allocator = allocator,
+            .operations = operations,
+            .ready = ready,
+            .sockets = sockets,
+            .free_socket = 0,
+            .queue = queue,
+        };
         const listener = try createSocket();
         errdefer closeSocket(listener);
         const one: i32 = 1;
@@ -179,10 +224,8 @@ pub const Backend = struct {
         var returned: u32 = 0;
         // Resolve the listener's provider extension at startup, before IOCP association.
         if (win32.WSAIoctl(listener, 0xc8000006, &guid, @sizeOf(Guid), @ptrCast(&accept_ex), @sizeOf(AcceptEx), &returned, null, null) != 0 or returned != @sizeOf(AcceptEx)) return error.AcceptExUnavailable;
-        const queue = win32.CreateIoCompletionPort(@ptrFromInt(invalid_socket), null, 0, 1) orelse return error.IocpCreateFailed;
-        errdefer windows.CloseHandle(queue);
         if (win32.CreateIoCompletionPort(@ptrFromInt(listener), queue, data_key, 0) != queue) return error.IocpAssociateFailed;
-        return .{ .allocator = allocator, .operations = operations, .ready = ready, .sockets = sockets, .free_socket = 0, .listener = listener, .queue = queue, .accept_ex = accept_ex, .bound_port = std.mem.bigToNative(u16, address.port) };
+        return .{ .allocator = allocator, .operations = operations, .ready = ready, .sockets = sockets, .free_socket = 0, .listener = listener, .queue = queue, .accept_ex = accept_ex, .bound_port = std.mem.bigToNative(u16, address.port), .handoff_accepts = mode == .acceptor };
     }
 
     pub fn enableGather(self: *Backend) !void {
@@ -195,7 +238,7 @@ pub const Backend = struct {
         // A failed shutdown retains this storage and terminates the whole process.
         assert(self.outstanding == 0 and self.ready_count == 0 and self.socket_count == 0);
         for (self.operations) |op| assert(op.kind == .free);
-        closeSocket(self.listener);
+        if (self.listener != invalid_socket) closeSocket(self.listener);
         windows.CloseHandle(self.queue);
         self.allocator.free(self.sockets);
         self.allocator.free(self.ready);
@@ -233,6 +276,33 @@ pub const Backend = struct {
         return @intCast(index);
     }
 
+    /// Ends source table ownership only after the terminal accept was collected.
+    pub fn exportAccepted(self: *Backend, socket: Socket) !DetachedSocket {
+        const entry = self.socketEntry(socket);
+        if (entry.owned != 0) return error.SocketBusy;
+        if (!entry.exportable or entry.associated) return error.SocketNotExportable;
+        const detached: DetachedSocket = .{ .handle = entry.handle };
+        self.freeSocketEntry(socket);
+        return detached;
+    }
+
+    /// Associates a transferred handle exactly once, before any destination I/O.
+    /// Capacity or association failure leaves the caller's handle untouched.
+    pub fn importAccepted(self: *Backend, detached: *DetachedSocket) !Socket {
+        assert(detached.handle != invalid_socket);
+        const index = self.free_socket orelse return error.SocketCapacityExceeded;
+        const entry = &self.sockets[index];
+        assert(entry.handle == invalid_socket and entry.owned == 0);
+        const associated = win32.CreateIoCompletionPort(@ptrFromInt(detached.handle), self.queue, data_key, 0) orelse return error.IocpAssociateFailed;
+        assert(associated == self.queue);
+        self.free_socket = entry.next;
+        entry.* = .{ .handle = detached.handle, .associated = true };
+        self.socket_count += 1;
+        assert(self.socket_count <= self.sockets.len);
+        detached.* = .{};
+        return @intCast(index);
+    }
+
     fn finish(self: *Backend, op: *Operation, result: i32) void {
         assert(op.kind != .free and !op.submitted and op.result == null);
         op.result = result;
@@ -251,6 +321,8 @@ pub const Backend = struct {
     }
 
     pub fn accept(self: *Backend, cell: u32, token: u64) !void {
+        const accept_ex = self.accept_ex orelse return error.ListenerUnavailable;
+        assert(self.listener != invalid_socket);
         const op = try self.claim(cell, .accept, token);
         op.socket = self.allocateSocket() catch {
             self.finish(op, negative(10055));
@@ -258,7 +330,7 @@ pub const Backend = struct {
         };
         self.socketEntry(op.socket).owned += 1;
         var received: u32 = 0;
-        const immediate = self.accept_ex(self.listener, self.socketEntry(op.socket).handle, &op.addresses, 0, address_bytes, address_bytes, &received, &op.overlapped) != 0;
+        const immediate = accept_ex(self.listener, self.socketEntry(op.socket).handle, &op.addresses, 0, address_bytes, address_bytes, &received, &op.overlapped) != 0;
         // Zero receive length prevents an idle peer from withholding acceptance.
         self.initiation(op, immediate);
     }
@@ -266,6 +338,7 @@ pub const Backend = struct {
     pub fn recv(self: *Backend, cell: u32, token: u64, socket: Socket, buffer: []u8) !void {
         assert(buffer.len > 0 and buffer.len <= std.math.maxInt(i32));
         const entry = self.socketEntry(socket);
+        assert(entry.associated and !entry.exportable);
         const op = try self.claim(cell, .recv, token);
         op.socket = socket;
         op.length = @intCast(buffer.len);
@@ -277,6 +350,7 @@ pub const Backend = struct {
     pub fn send(self: *Backend, cell: u32, token: u64, socket: Socket, bytes: []const u8) !void {
         assert(bytes.len > 0 and bytes.len <= std.math.maxInt(i32));
         const entry = self.socketEntry(socket);
+        assert(entry.associated and !entry.exportable);
         const op = try self.claim(cell, .send, token);
         op.socket = socket;
         op.length = @intCast(bytes.len);
@@ -296,6 +370,7 @@ pub const Backend = struct {
         }
         assert(length > 0);
         const entry = self.socketEntry(socket);
+        assert(entry.associated and !entry.exportable);
         const op = try self.claim(cell, .sendv, token);
         op.socket = socket;
         op.length = @intCast(length);
@@ -351,14 +426,24 @@ pub const Backend = struct {
         if (success) {
             assert(bytes == entry.bytes and bytes <= op.length);
             if (op.kind == .accept) {
-                const socket = self.socketEntry(op.socket).handle;
+                const socket_entry = self.socketEntry(op.socket);
+                const socket = socket_entry.handle;
                 const one: i32 = 1;
                 if (win32.setsockopt(socket, ws.SOL.SOCKET, 0x700b, &self.listener, @sizeOf(usize)) != 0 or
-                    win32.setsockopt(socket, ws.IPPROTO.TCP, ws.TCP.NODELAY, &one, @sizeOf(i32)) != 0 or
-                    win32.CreateIoCompletionPort(@ptrFromInt(socket), self.queue, data_key, 0) != self.queue)
+                    win32.setsockopt(socket, ws.IPPROTO.TCP, ws.TCP.NODELAY, &one, @sizeOf(i32)) != 0)
                 {
                     result = negative(0);
-                } else result = op.socket;
+                } else if (self.handoff_accepts) {
+                    // The listener's IOCP owns this terminal AcceptEx packet.
+                    // The accepted handle still has no completion-port association.
+                    socket_entry.exportable = true;
+                    result = op.socket;
+                } else if (win32.CreateIoCompletionPort(@ptrFromInt(socket), self.queue, data_key, 0) != self.queue) {
+                    result = negative(0);
+                } else {
+                    socket_entry.associated = true;
+                    result = op.socket;
+                }
             }
         }
         self.finish(op, result);
@@ -417,6 +502,12 @@ pub const Backend = struct {
         const entry = self.socketEntry(socket);
         assert(entry.owned == 0 and self.socket_count > 0);
         closeSocket(entry.handle);
+        self.freeSocketEntry(socket);
+    }
+
+    fn freeSocketEntry(self: *Backend, socket: Socket) void {
+        const entry = self.socketEntry(socket);
+        assert(entry.owned == 0 and self.socket_count > 0);
         entry.* = .{ .next = self.free_socket };
         self.free_socket = @intCast(socket);
         self.socket_count -= 1;
@@ -499,6 +590,215 @@ test "IOCP exact startup storage includes socket table and rejects one byte shor
     try std.testing.expectEqual(@as(usize, 0), exact.late_calls.load(.acquire));
 }
 
+test "IOCP listenerless destination has exact startup storage and no accept operation" {
+    const Budget = @import("budget.zig").Budget;
+    const required = try Backend.heapBytes(1);
+    var short: Budget = .{ .upstream = std.testing.allocator, .limit_bytes = required - 1 };
+    try std.testing.expectError(error.OutOfMemory, Backend.initDestination(short.allocator(), 1));
+    try std.testing.expectEqual(@as(usize, 0), short.live_bytes);
+    try std.testing.expectError(error.InvalidConnectionLimit, Backend.initDestination(std.testing.allocator, 0));
+    var exact: Budget = .{ .upstream = std.testing.allocator, .limit_bytes = required };
+    var destination = try Backend.initDestination(exact.allocator(), 1);
+    try std.testing.expectEqual(required, exact.live_bytes);
+    try std.testing.expectEqual(invalid_socket, destination.listener);
+    try std.testing.expectEqual(@as(u16, 0), destination.port());
+    exact.sealed.store(true, .release);
+    try std.testing.expectError(error.ListenerUnavailable, destination.accept(4, 1));
+    try std.testing.expectEqual(@as(usize, 0), destination.outstanding);
+    destination.deinit();
+    try std.testing.expectEqual(@as(usize, 0), exact.live_bytes);
+    try std.testing.expectEqual(@as(usize, 0), exact.late_calls.load(.acquire));
+}
+
+test "IOCP detached accept changes ownership before destination receive send and cancellation" {
+    const Budget = @import("budget.zig").Budget;
+    const required = try std.math.mul(usize, 2, try Backend.heapBytes(1));
+    var budget: Budget = .{ .upstream = std.testing.allocator, .limit_bytes = required };
+    var source = try Backend.initAcceptor(budget.allocator(), 1, 0);
+    var destination = try Backend.initDestination(budget.allocator(), 1);
+    try destination.enableGather();
+    try std.testing.expectEqual(required, budget.live_bytes);
+    budget.sealed.store(true, .release);
+    try source.accept(4, 11);
+    const pending_socket = source.operations[4].socket;
+    try std.testing.expectError(error.SocketBusy, source.exportAccepted(pending_socket));
+    var client = try fixture.client(source.port());
+    defer if (client != invalid_socket) closeSocket(client);
+    // The client sends no bytes before this terminal accept is collected.
+    const accepted = try fixture.completion(&source);
+    try std.testing.expectEqual(@as(u64, 11), accepted.token);
+    try std.testing.expect(accepted.result >= 0);
+    try std.testing.expect(!source.socketEntry(accepted.result).associated);
+    var detached = try source.exportAccepted(accepted.result);
+    try std.testing.expectEqual(@as(usize, 0), source.socket_count);
+    try std.testing.expectEqual(@as(usize, 0), source.outstanding);
+    const socket = try destination.importAccepted(&detached);
+    try std.testing.expectEqual(invalid_socket, detached.handle);
+    try std.testing.expect(destination.socketEntry(socket).associated);
+    try std.testing.expectError(error.SocketNotExportable, destination.exportAccepted(socket));
+    try destination.setSendBuffer(socket, 1024);
+    var input: [16]u8 = undefined;
+    try destination.recv(0, 21, socket, &input);
+    // Source cancellation cells cannot cancel a destination's borrowed receive.
+    try source.accept(4, 31);
+    try source.cancel(5, 32, 4);
+    var accept_seen = false;
+    var cancel_seen = false;
+    for (0..2) |_| {
+        const completed = try fixture.completion(&source);
+        if (completed.token == 31) {
+            try std.testing.expect(!accept_seen);
+            try std.testing.expectEqual(negative(aborted_error), completed.result);
+            accept_seen = true;
+        } else {
+            try std.testing.expectEqual(@as(u64, 32), completed.token);
+            try std.testing.expect(!cancel_seen);
+            try std.testing.expectEqual(@as(i32, 0), completed.result);
+            cancel_seen = true;
+        }
+    }
+    try std.testing.expect(accept_seen and cancel_seen);
+    try std.testing.expectEqual(@as(usize, 1), destination.outstanding);
+    try std.testing.expectEqual(@as(i32, 1), fixture.send(client, "x", 1, 0));
+    const received = try fixture.completion(&destination);
+    try std.testing.expectEqual(@as(u64, 21), received.token);
+    try std.testing.expectEqual(@as(i32, 1), received.result);
+    try std.testing.expectEqual(@as(u8, 'x'), input[0]);
+    const expected = "head:body";
+    const vectors = [_]std.c.iovec_const{ common.vector("head:"), common.vector("body") };
+    var offset: usize = 0;
+    const send_deadline = win32.GetTickCount64() + 3000;
+    while (offset < expected.len) {
+        if (win32.GetTickCount64() >= send_deadline) return error.SendDeadline;
+        var skip = offset;
+        var selected: [2]std.c.iovec_const = undefined;
+        var count: usize = 0;
+        for (vectors) |vector| {
+            if (skip >= vector.len) {
+                skip -= vector.len;
+                continue;
+            }
+            selected[count] = common.vector(vector.base[skip..vector.len]);
+            skip = 0;
+            count += 1;
+        }
+        try destination.sendv(1, 22, socket, selected[0..count]);
+        const sent = try fixture.completion(&destination);
+        try std.testing.expectEqual(@as(u64, 22), sent.token);
+        try std.testing.expect(sent.result > 0 and sent.result <= expected.len - offset);
+        offset += @intCast(sent.result);
+    }
+    var output: [expected.len]u8 = undefined;
+    try fixture.readExact(client, &output);
+    try std.testing.expectEqualStrings(expected, &output);
+    try destination.recv(0, 23, socket, &input);
+    try destination.cancel(2, 24, 0);
+    var receive_seen = false;
+    cancel_seen = false;
+    for (0..2) |_| {
+        const completed = try fixture.completion(&destination);
+        if (completed.token == 23) {
+            try std.testing.expect(!receive_seen);
+            try std.testing.expectEqual(negative(aborted_error), completed.result);
+            receive_seen = true;
+        } else {
+            try std.testing.expectEqual(@as(u64, 24), completed.token);
+            try std.testing.expect(!cancel_seen);
+            try std.testing.expectEqual(@as(i32, 0), completed.result);
+            cancel_seen = true;
+        }
+    }
+    try std.testing.expect(receive_seen and cancel_seen);
+    try std.testing.expectEqual(@as(i32, 0), win32.shutdown(client, 1));
+    try destination.recv(0, 25, socket, &input);
+    const eof = try fixture.completion(&destination);
+    try std.testing.expectEqual(@as(u64, 25), eof.token);
+    try std.testing.expectEqual(@as(i32, 0), eof.result);
+    destination.close(0, socket);
+    closeSocket(client);
+    client = invalid_socket;
+    destination.deinit();
+    source.deinit();
+    try std.testing.expectEqual(@as(usize, 0), budget.live_bytes);
+    try std.testing.expectEqual(@as(usize, 0), budget.late_calls.load(.acquire));
+}
+
+test "IOCP failed destination import retains the detached handle for retry or close" {
+    var source = try Backend.initAcceptor(std.testing.allocator, 1, 0);
+    defer source.deinit();
+    var destination = try Backend.initDestination(std.testing.allocator, 1);
+    defer destination.deinit();
+    // The table has one configured connection plus one accept staging entry.
+    var sockets: [2]Socket = undefined;
+    var clients: [2]usize = undefined;
+    for (&sockets, &clients) |*socket, *client| {
+        client.* = try fixture.client(source.port());
+        try source.accept(4, 1);
+        const accepted = try fixture.completion(&source);
+        try std.testing.expect(accepted.result >= 0);
+        var detached = try source.exportAccepted(accepted.result);
+        socket.* = try destination.importAccepted(&detached);
+        try std.testing.expectEqual(invalid_socket, detached.handle);
+    }
+    defer for (clients) |client| closeSocket(client);
+    const extra_client = try fixture.client(source.port());
+    defer closeSocket(extra_client);
+    try source.accept(4, 2);
+    const extra = try fixture.completion(&source);
+    try std.testing.expect(extra.result >= 0);
+    var detached = try source.exportAccepted(extra.result);
+    const handle = detached.handle;
+    for (0..3) |_| {
+        try std.testing.expectError(error.SocketCapacityExceeded, destination.importAccepted(&detached));
+        try std.testing.expectEqual(handle, detached.handle);
+        try std.testing.expectEqual(@as(usize, 2), destination.socket_count);
+    }
+    destination.close(0, sockets[0]);
+    // A controlled invalid destination port makes association fail without I/O.
+    const queue = destination.queue;
+    destination.queue = @ptrFromInt(invalid_socket);
+    const failed_import = destination.importAccepted(&detached);
+    destination.queue = queue;
+    try std.testing.expectError(error.IocpAssociateFailed, failed_import);
+    try std.testing.expectEqual(handle, detached.handle);
+    try std.testing.expectEqual(@as(usize, 1), destination.socket_count);
+    const imported = try destination.importAccepted(&detached);
+    try std.testing.expectEqual(invalid_socket, detached.handle);
+    destination.close(0, imported);
+    destination.close(0, sockets[1]);
+    const rejected_client = try fixture.client(source.port());
+    defer closeSocket(rejected_client);
+    try source.accept(4, 3);
+    const rejected = try fixture.completion(&source);
+    try std.testing.expect(rejected.result >= 0);
+    var dropped = try source.exportAccepted(rejected.result);
+    dropped.close();
+    try std.testing.expectEqual(invalid_socket, dropped.handle);
+    var byte: [1]u8 = undefined;
+    try std.testing.expectEqual(@as(i32, 0), fixture.recv(rejected_client, &byte, 1, 0));
+    try std.testing.expectEqual(@as(usize, 0), source.socket_count);
+    try std.testing.expectEqual(@as(usize, 0), destination.socket_count);
+    for (1..17) |generation| {
+        const fresh_client = try fixture.client(source.port());
+        defer closeSocket(fresh_client);
+        const token = (@as(u64, generation) << 32) | 1;
+        try source.accept(4, token);
+        const accepted = try fixture.completion(&source);
+        try std.testing.expectEqual(token, accepted.token);
+        try std.testing.expect(accepted.result >= 0);
+        var transferred = try source.exportAccepted(accepted.result);
+        const fresh_socket = try destination.importAccepted(&transferred);
+        try std.testing.expectEqual(sockets[1], fresh_socket);
+        try destination.recv(0, token + 1, fresh_socket, &byte);
+        try std.testing.expectEqual(@as(i32, 1), fixture.send(fresh_client, "g", 1, 0));
+        const received = try fixture.completion(&destination);
+        try std.testing.expectEqual(token + 1, received.token);
+        try std.testing.expectEqual(@as(i32, 1), received.result);
+        try std.testing.expectEqual(@as(u8, 'g'), byte[0]);
+        destination.close(0, fresh_socket);
+    }
+}
+
 test "IOCP accepts without initial data and retains receive gather and EOF ownership" {
     var backend = try Backend.init(std.testing.allocator, 2, 0, false);
     defer backend.deinit();
@@ -511,6 +811,7 @@ test "IOCP accepts without initial data and retains receive gather and EOF owner
     try std.testing.expect(accepted.result >= 0);
     const peer = accepted.result;
     defer backend.close(0, peer);
+    try std.testing.expectError(error.SocketNotExportable, backend.exportAccepted(peer));
     try backend.setSendBuffer(peer, 1024);
     var input: [32]u8 = undefined;
     try backend.recv(0, 22, peer, &input);
