@@ -38,7 +38,10 @@ The documentation reader includes the new native shard receipt.
 Final publication gates belong to the PR's exact pushed feature commit; consult its checks and description.
 Do not reinterpret this candidate receipt as evidence for an unidentified later source tree.
 
-Wiki synchronization records the merged implementation alongside its pinned feature-runtime evidence.
+Wiki synchronization is published in [commit `a48ddf3`](https://github.com/technologylab-ai/zigllmwiki/commit/a48ddf3ce6d956b4f7e1e0db6a7a31e403c0d27f).
+The [HTTP design page](https://technologylab-ai.github.io/zigllmwiki/?page=wiki/bounded-http-server-design.md) links the merged implementation and pinned feature-runtime evidence.
+The wiki preserves the final native Windows archive, qualified source inputs, and immutable historical packets.
+Exact wiki publication receipts remain in `../zigllmwiki-windows-shards/.zig-cache/windows-shards-publication/summary.json`.
 Do not rewrite earlier immutable source records or treat the merge as another Windows test run.
 The wiki's M3-006 remains postponed.
 The [roadmap](ROADMAP.md) still contains API, reliability, performance, and higher-level work.
