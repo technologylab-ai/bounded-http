@@ -1,6 +1,14 @@
-# Bounded Zig HTTP
+# bounded/http
 
-Read the [published whitepaper](https://technologylab-ai.github.io/zig-http/) in your browser.
+*for servers that stay within their bounds*
+
+**Fast by design. Explicit about limits.**
+
+The repository and executable use `bounded-http`.
+The Zig package and module use `bounded_http`.
+The project was previously named `zig-http`.
+
+Read the [published whitepaper](https://technologylab-ai.github.io/bounded-http/) in your browser.
 The site includes rendered Markdown guides and syntax highlighting.
 
 Start with the [architecture guide](docs/ARCHITECTURE.md) to understand clusters, ownership, startup, and request processing.
@@ -31,7 +39,7 @@ ReleaseSafe is the preferred experiment mode; assertions remain enabled.
 zig version
 zig build verify -Doptimize=ReleaseSafe
 zig build -Doptimize=ReleaseSafe
-./zig-out/bin/zig-http --port 8080 --connections 128
+./zig-out/bin/bounded-http --port 8080 --connections 128
 ```
 
 The version must print `0.16.0`. The server prints `READY` to stderr after
@@ -61,7 +69,7 @@ Run the wire/ownership suite against the installed binary, and optionally check
 Debug as well:
 
 ```sh
-python3 tests/integration.py --server zig-out/bin/zig-http --json .zig-cache/integration.json
+python3 tests/integration.py --server zig-out/bin/bounded-http --json .zig-cache/integration.json
 zig build verify -Doptimize=Debug
 ```
 
@@ -84,7 +92,7 @@ callback is the maintained example. [src/server.zig](src/server.zig) exposes
 experimental and read the [ownership contract](docs/OWNERSHIP.md) before
 retaining slices or adding asynchronous application work.
 
-The default `./zig-out/bin/zig-http` uses inline execution, gather sends, up to 128 responses per batch
+The default `./zig-out/bin/bounded-http` uses inline execution, gather sends, up to 128 responses per batch
 and, on Linux, one I/O shard per CPU the process may run on (`--shards N` sets it; macOS runs one).
 `--execution inline` selects it explicitly.
 It provisions **zero application workers** and runs the same handler/writer path
@@ -117,8 +125,9 @@ means the local socket accepted the bytes; it does not prove peer receipt.
 `return writer.finish()` sends the remaining bytes and completes HTTP framing,
 without another application callback. No later writes belong to that response.
 
-`borrow` and `begin`'s `content_type` currently require request-owned input or
-immutable server-lifetime storage. There is no dynamic lease-release callback
+`borrow` requires request-owned input or immutable server-lifetime storage.
+`begin` copies its `content_type` argument during the call.
+There is no dynamic lease-release callback
 on finish/cancellation. Stack locals and externally recycled buffers must not
 escape a callback this way. If `reserve` returns `WouldBlock`, flush the existing
 committed bytes and continue from `context.state` on resume; a reservation larger

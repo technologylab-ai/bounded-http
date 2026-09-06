@@ -25,6 +25,32 @@ pub const chunk_size_field_bytes: usize = 10;
 const chunk_slack_bytes: usize = 7;
 pub const max_content_type_bytes: usize = 128;
 
+/// Ordinary response construction errors, including untrusted header values.
+pub fn validateHeader(name: []const u8, value: []const u8) !void {
+    if (name.len == 0) return error.InvalidHeader;
+    for (name) |byte| switch (byte) {
+        'a'...'z', 'A'...'Z', '0'...'9', '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~' => {},
+        else => return error.InvalidHeader,
+    };
+    for (value) |byte| {
+        if ((byte < 32 and byte != '\t') or byte == 127) return error.InvalidHeader;
+    }
+    inline for (.{ "Content-Length", "Transfer-Encoding", "Connection", "Content-Type", "Trailer", "Upgrade", "Keep-Alive", "Proxy-Connection", "TE", "Server", "Date" }) |reserved| {
+        if (std.ascii.eqlIgnoreCase(name, reserved)) return error.ReservedHeader;
+    }
+}
+
+fn validateHeaderBlock(bytes: []const u8) !void {
+    var offset: usize = 0;
+    while (offset < bytes.len) {
+        const end = std.mem.findPosLinear(u8, bytes, offset, "\r\n") orelse return error.InvalidHeader;
+        const line = bytes[offset..end];
+        const colon = std.mem.findScalar(u8, line, ':') orelse return error.InvalidHeader;
+        try validateHeader(line[0..colon], line[colon + 1 ..]);
+        offset = end + 2;
+    }
+}
+
 /// Date/status prefix rebuilt by one I/O owner once per second. Inline begin()
 /// reads that owner's cache; worker begin() reads an exclusive slot snapshot
 /// published before dispatch. begin() copies the prefix instead of formatting.
@@ -33,7 +59,7 @@ pub const HeaderCache = struct {
     ok_prefix: [80]u8 = undefined,
     ok_prefix_len: usize = 0,
 
-    const ok_head = "HTTP/1.1 200 OK\r\nServer: zig-http\r\nDate: ";
+    const ok_head = "HTTP/1.1 200 OK\r\nServer: bounded-http\r\nDate: ";
 
     pub fn refresh(self: *HeaderCache, date: *const [29]u8) void {
         self.date = date.*;
@@ -51,13 +77,25 @@ pub const HeaderCache = struct {
 pub fn reason(status: u16) []const u8 {
     return switch (status) {
         200 => "OK",
+        201 => "Created",
+        202 => "Accepted",
         204 => "No Content",
+        205 => "Reset Content",
+        301 => "Moved Permanently",
+        302 => "Found",
+        303 => "See Other",
         304 => "Not Modified",
+        307 => "Temporary Redirect",
+        308 => "Permanent Redirect",
         400 => "Bad Request",
+        401 => "Unauthorized",
+        403 => "Forbidden",
         404 => "Not Found",
         405 => "Method Not Allowed",
+        409 => "Conflict",
         413 => "Content Too Large",
         414 => "URI Too Long",
+        415 => "Unsupported Media Type",
         417 => "Expectation Failed",
         431 => "Request Header Fields Too Large",
         500 => "Internal Server Error",
@@ -142,6 +180,8 @@ pub const Writer = struct {
     frozen: bool = false,
     headers_committed: bool = false,
     copied_borrow: bool = false,
+    /// Payload bytes compacted from an unpublished one-shot draft.
+    draft_copy_bytes: usize = 0,
 
     pub fn init(arena: []u8, header_cache: *const HeaderCache, copy_threshold: usize) Writer {
         return .{ .arena = arena, .header_cache = header_cache, .copy_threshold = copy_threshold };
@@ -166,6 +206,7 @@ pub const Writer = struct {
         self.frozen = false;
         self.headers_committed = false;
         self.copied_borrow = false;
+        self.draft_copy_bytes = 0;
     }
 
     /// Continue the same response after a flush drained the arena. The head is
@@ -179,6 +220,7 @@ pub const Writer = struct {
         self.borrowed = null;
         self.chunk_size_at = null;
         self.copied_borrow = false;
+        self.draft_copy_bytes = 0;
         if (self.chunked()) {
             self.chunk_size_at = at;
             self.buffered += chunk_size_field_bytes;
@@ -200,10 +242,41 @@ pub const Writer = struct {
         return self.arena.len - header_reserve_bytes - chunk_slack_bytes;
     }
 
+    /// Return bounded scratch for the current unpublished response.
+    /// The slice excludes earlier snapshots and lasts only during this callback.
+    /// The adapter must reserve this capacity through Config.callback_output_reserve.
+    /// A zero-length request checks draft state without exposing storage.
+    pub fn draftStorage(self: *Writer, required_bytes: usize) ![]u8 {
+        if (self.frozen or self.began or self.headers_committed or self.reserved != 0 or
+            self.borrowed != null or self.buffered != self.base) return error.InvalidState;
+        if (required_bytes > self.arena.len - self.base) return error.WouldBlock;
+        return self.arena[self.base..][0..required_bytes];
+    }
+
+    /// Discard only the current unpublished response, including a partial begin.
+    /// Earlier snapshots remain frozen. The adapter must discard its draft metadata.
+    pub fn discardDraft(self: *Writer) !void {
+        if (self.frozen or self.headers_committed) return error.InvalidState;
+        self.open(self.base, self.keep_alive, self.head_only);
+    }
+
     pub fn begin(self: *Writer, status: u16, content_type: []const u8, length: ?usize) !void {
+        return self.beginWithHeaders(status, content_type, length, "");
+    }
+
+    /// Extra fields are complete name/value lines ending in CRLF.
+    /// The writer validates framing before changing its state or output.
+    /// This method copies Content-Type and extra fields before returning.
+    /// Arena-backed arguments must start beyond the current snapshot's header_reserve_bytes prefix.
+    /// The adapter must keep its staged arguments disjoint.
+    /// Callers reserve additional head space before dispatch; begin keeps its fixed reserve.
+    pub fn beginWithHeaders(self: *Writer, status: u16, content_type: []const u8, length: ?usize, extra_headers: []const u8) !void {
         if (self.frozen or self.began or self.headers_committed) return error.InvalidState;
         if (status < 200 or status > 599 or content_type.len > max_content_type_bytes) return error.InvalidResponse;
         for (content_type) |byte| if (byte < 32 or byte > 126) return error.InvalidResponse;
+        try validateHeaderBlock(extra_headers);
+        const head_bound = std.math.add(usize, header_reserve_bytes, extra_headers.len) catch return error.InvalidResponse;
+        if (head_bound > self.arena.len - self.buffered) return error.WouldBlock;
         self.status = status;
         self.content_type = content_type;
         self.content_length = length;
@@ -229,7 +302,7 @@ pub const Writer = struct {
             const text = reason(status);
             @memcpy(out[n..][0..text.len], text);
             n += text.len;
-            const server = "\r\nServer: zig-http\r\nDate: ";
+            const server = "\r\nServer: bounded-http\r\nDate: ";
             @memcpy(out[n..][0..server.len], server);
             n += server.len;
             @memcpy(out[n..][0..29], &self.header_cache.date);
@@ -240,6 +313,7 @@ pub const Writer = struct {
         @memcpy(out[n..][0..14], "Content-Type: ");
         n += 14;
         copyShort(out[n..], content_type);
+        self.content_type = out[n..][0..content_type.len];
         n += content_type.len;
         @memcpy(out[n..][0..2], "\r\n");
         n += 2;
@@ -261,13 +335,15 @@ pub const Writer = struct {
             @memcpy(out[n..][0..close.len], close);
             n += close.len;
         }
+        std.mem.copyForwards(u8, out[n..][0..extra_headers.len], extra_headers);
+        n += extra_headers.len;
         @memcpy(out[n..][0..2], "\r\n");
         n += 2;
         if (self.chunked()) {
             self.chunk_size_at = n;
             n += chunk_size_field_bytes;
         }
-        assert(n - self.buffered <= header_reserve_bytes);
+        assert(n - self.buffered <= head_bound);
         self.buffered = n;
         self.body_start = n;
     }
@@ -292,6 +368,22 @@ pub const Writer = struct {
         const destination = try self.reserve(bytes.len);
         @memcpy(destination, bytes);
         self.commit(bytes.len);
+    }
+
+    /// Copy staged body bytes after begin, before publishing the response.
+    /// The source may overlap the destination in either direction.
+    /// The writer counts this copy separately from small borrowed-body copies.
+    pub fn writeDraftBody(self: *Writer, body: []const u8) !void {
+        if (!self.began or self.headers_committed) return error.InvalidState;
+        const copied = std.math.add(usize, self.draft_copy_bytes, body.len) catch return error.InvalidResponse;
+        const destination = try self.reserve(body.len);
+        if (@intFromPtr(destination.ptr) <= @intFromPtr(body.ptr)) {
+            std.mem.copyForwards(u8, destination, body);
+        } else {
+            std.mem.copyBackwards(u8, destination, body);
+        }
+        self.commit(body.len);
+        self.draft_copy_bytes = copied;
     }
 
     /// Storage must be request-owned input or immutable server-lifetime assets;
@@ -358,7 +450,7 @@ test "begin writes the head into the arena and flush keeps the snapshot" {
     var writer = Writer.init(&arena, &cache, 0);
     writer.open(0, true, false);
     try writer.begin(200, "text/plain", 7);
-    const head = "HTTP/1.1 200 OK\r\nServer: zig-http\r\nDate: Sat, 05 Sep 2026 12:34:56 GMT\r\nContent-Type: text/plain\r\nContent-Length: 7\r\n\r\n";
+    const head = "HTTP/1.1 200 OK\r\nServer: bounded-http\r\nDate: Sat, 05 Sep 2026 12:34:56 GMT\r\nContent-Type: text/plain\r\nContent-Length: 7\r\n\r\n";
     try std.testing.expectEqualStrings(head, arena[0..writer.body_start]);
     const reserved = try writer.reserve(8);
     @memcpy(reserved[0..3], "one");
@@ -378,7 +470,7 @@ test "non-200 heads, close and chunked size fields are laid out exactly" {
     var writer = Writer.init(&arena, &cache, 0);
     writer.open(100, false, false);
     try writer.begin(404, "text/html; charset=utf-8", null);
-    const head = "HTTP/1.1 404 Not Found\r\nServer: zig-http\r\nDate: Sat, 05 Sep 2026 12:34:56 GMT\r\n" ++
+    const head = "HTTP/1.1 404 Not Found\r\nServer: bounded-http\r\nDate: Sat, 05 Sep 2026 12:34:56 GMT\r\n" ++
         "Content-Type: text/html; charset=utf-8\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
     try std.testing.expectEqualStrings(head, arena[100 .. 100 + head.len]);
     try std.testing.expectEqual(@as(usize, 100 + head.len), writer.chunk_size_at.?);
@@ -437,4 +529,122 @@ test "reservation capacity errors are recoverable and leave slack for chunk fram
     try std.testing.expectEqual(@as(usize, 0), writer.chunk_size_at.?);
     try std.testing.expectEqual(chunk_size_field_bytes, writer.body_start);
     try std.testing.expectError(error.InvalidState, writer.begin(200, "text/plain", null));
+}
+
+test "extra header validation is transactional and bounded before begin" {
+    var arena: [1024]u8 = undefined;
+    const cache = testCache();
+    var writer = Writer.init(&arena, &cache, 0);
+    writer.open(0, true, false);
+    try std.testing.expectError(error.InvalidHeader, writer.beginWithHeaders(200, "text/plain", 0, "Bad Name: x\r\n"));
+    try std.testing.expectError(error.InvalidHeader, writer.beginWithHeaders(200, "text/plain", 0, "X: missing terminator"));
+    try std.testing.expectError(error.ReservedHeader, writer.beginWithHeaders(200, "text/plain", 0, "Connection: close\r\n"));
+    try std.testing.expect(!writer.began and writer.buffered == 0);
+    try writer.beginWithHeaders(303, "text/plain", 0, "Location: /next\r\nSet-Cookie: a=1\r\nSet-Cookie: b=2\r\n");
+    _ = writer.finish();
+    try std.testing.expect(std.mem.indexOf(u8, arena[0..writer.buffered], "HTTP/1.1 303 See Other\r\n") != null);
+    try std.testing.expect(std.mem.endsWith(u8, arena[0..writer.buffered], "Location: /next\r\nSet-Cookie: a=1\r\nSet-Cookie: b=2\r\n\r\n"));
+    writer.release();
+    writer.open(arena.len - header_reserve_bytes, true, false);
+    try std.testing.expectError(error.WouldBlock, writer.beginWithHeaders(200, "text/plain", 0, "X: y\r\n"));
+    try std.testing.expect(!writer.began and writer.buffered == writer.base);
+    try writer.begin(200, "text/plain", 0);
+}
+
+test "draft storage excludes frozen prefixes and discard preserves request facts" {
+    var arena: [1024]u8 = @splat(0xa5);
+    const cache = testCache();
+    const prefix = "older frozen response";
+    @memcpy(arena[0..prefix.len], prefix);
+    var writer = Writer.init(&arena, &cache, 0);
+    writer.open(prefix.len, false, true);
+    const scratch = try writer.draftStorage(arena.len - prefix.len);
+    try std.testing.expectEqual(arena[prefix.len..].ptr, scratch.ptr);
+    try std.testing.expectEqual(arena.len - prefix.len, scratch.len);
+    try std.testing.expectError(error.WouldBlock, writer.draftStorage(scratch.len + 1));
+    try std.testing.expectEqual(@as(usize, 0), (try writer.draftStorage(0)).len);
+    @memset(scratch, 'x');
+    try writer.discardDraft();
+    try writer.discardDraft();
+    try std.testing.expectEqualStrings(prefix, arena[0..prefix.len]);
+    try std.testing.expect(!writer.keep_alive and writer.head_only);
+    try writer.begin(200, "text/plain", 3);
+    try writer.writeDraftBody("old");
+    try std.testing.expectError(error.InvalidState, writer.draftStorage(0));
+    try writer.discardDraft();
+    try std.testing.expectEqual(@as(usize, 0), writer.draft_copy_bytes);
+    try writer.begin(500, "text/plain", 3);
+    try writer.writeDraftBody("new");
+    _ = writer.finish();
+    try std.testing.expectEqualStrings("new", writer.committed());
+    try std.testing.expectEqualStrings(prefix, arena[0..prefix.len]);
+    try std.testing.expectError(error.InvalidState, writer.discardDraft());
+    try std.testing.expectError(error.InvalidState, writer.draftStorage(0));
+    try std.testing.expectError(error.InvalidState, writer.writeDraftBody(""));
+}
+
+test "draft state rejects active reservations borrows and transmitted heads" {
+    var arena: [1024]u8 = undefined;
+    const cache = testCache();
+    var writer = Writer.init(&arena, &cache, 0);
+    writer.open(0, true, false);
+    try std.testing.expectError(error.InvalidState, writer.writeDraftBody("not begun"));
+    _ = try writer.reserve(1);
+    try std.testing.expectError(error.InvalidState, writer.draftStorage(0));
+    try writer.discardDraft();
+    try writer.borrow("immutable asset");
+    try std.testing.expectError(error.InvalidState, writer.draftStorage(0));
+    try writer.discardDraft();
+    try writer.begin(200, "text/plain", null);
+    _ = writer.flush();
+    writer.release();
+    writer.headers_committed = true;
+    writer.resumeSnapshot(0);
+    try std.testing.expectError(error.InvalidState, writer.discardDraft());
+    try std.testing.expectError(error.InvalidState, writer.draftStorage(0));
+    try std.testing.expectError(error.InvalidState, writer.writeDraftBody(""));
+}
+
+test "draft body copies overlap in both directions and count only committed bytes" {
+    const text = "abcdefgh";
+    inline for (.{ false, true }) |copy_backwards| {
+        var arena: [1024]u8 = undefined;
+        const cache = testCache();
+        var writer = Writer.init(&arena, &cache, 0);
+        writer.open(0, true, false);
+        try writer.begin(200, "text/plain", 4 + text.len);
+        try writer.write("xxab");
+        const source_at = if (copy_backwards) writer.buffered - 2 else writer.buffered + 2;
+        @memcpy(arena[source_at..][0..text.len], text);
+        try writer.writeDraftBody(arena[source_at..][0..text.len]);
+        try std.testing.expectEqual(text.len, writer.draft_copy_bytes);
+        try std.testing.expectEqual(@as(usize, 0), writer.reserved);
+        const before = writer.buffered;
+        try std.testing.expectError(error.WouldBlock, writer.writeDraftBody(&arena));
+        try std.testing.expectEqual(before, writer.buffered);
+        try std.testing.expectEqual(text.len, writer.draft_copy_bytes);
+        _ = writer.finish();
+        try std.testing.expectEqualStrings("xxab" ++ text, writer.committed());
+    }
+}
+
+test "draft header aliases copy before storage is reused and preserve repeated fields" {
+    var arena: [2048]u8 = undefined;
+    const cache = testCache();
+    var writer = Writer.init(&arena, &cache, 0);
+    writer.open(0, true, false);
+    const scratch = try writer.draftStorage(arena.len);
+    const content_type = "application/example";
+    const fields = "X-Note: staged\r\nSet-Cookie: a=1\r\nSet-Cookie: b=2\r\n";
+    const type_at = header_reserve_bytes;
+    const fields_at = type_at + max_content_type_bytes;
+    @memcpy(scratch[type_at..][0..content_type.len], content_type);
+    @memcpy(scratch[fields_at..][0..fields.len], fields);
+    try writer.beginWithHeaders(201, scratch[type_at..][0..content_type.len], 0, scratch[fields_at..][0..fields.len]);
+    @memset(scratch[type_at..][0..content_type.len], 'x');
+    @memset(scratch[fields_at..][0..fields.len], 'x');
+    try std.testing.expectEqualStrings(content_type, writer.content_type);
+    _ = writer.finish();
+    try std.testing.expect(std.mem.indexOf(u8, arena[0..writer.body_start], "Content-Type: application/example\r\n") != null);
+    try std.testing.expect(std.mem.endsWith(u8, arena[0..writer.body_start], fields ++ "\r\n"));
 }

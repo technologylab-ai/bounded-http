@@ -96,14 +96,14 @@ def render(rows, cpus, preview_dir):
             low, high = value["min"] / 1e6, value["max"] / 1e6
             y = index + (-0.18 if server_index == 0 else 0.18)
             axis.barh(y, median, height=0.29, color=color, zorder=3,
-                      label=("Zig HTTP" if server == "zig-http" else "libreactor") if index == 0 else None)
+                      label=("bounded/http" if server == "zig-http" else "libreactor") if index == 0 else None)
             whisker = axis.errorbar(median, y, xerr=[[median - low], [high - median]], fmt="none",
                                     ecolor=PALETTE["libreactor"], capsize=4, elinewidth=1.2, zorder=4)
             for artist in (*whisker[1], *whisker[2]):
                 artist.set_path_effects([effects.Stroke(linewidth=3.5, foreground=BACKGROUND), effects.Normal()])
             axis.text(high + 0.16, y, "{:.3f} M/s".format(median), va="center", fontsize=10)
             description.append("Depth {}: {} median {:.6f} million responses/s; range {:.6f} to {:.6f}.".format(
-                row["depth"], server, median, low, high))
+                row["depth"], "bounded/http (recorded as zig-http)" if server == "zig-http" else server, median, low, high))
     axis.set_xlim(0, 16)
     axis.set_xticks(range(0, 17, 2))
     axis.set_yticks(range(3), ["Depth {}".format(row["depth"]) for row in selected])

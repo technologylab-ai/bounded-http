@@ -27,7 +27,7 @@ import time
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location("zig_http_smoke_server", ROOT / "tests/integration.py")
+SPEC = importlib.util.spec_from_file_location("bounded_http_smoke_server", ROOT / "tests/integration.py")
 WIRE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(WIRE)
 WORKLOADS = (("plaintext_p1", "plaintext", 1),
@@ -98,7 +98,7 @@ def main():
                          max_header=16384, timeout_ms=5000, stall_ms=1000,
                          send_chunk=65536, socket_send_buffer=65536,
                          duration_ms=args.timeout * 1000)
-    receipt = dict(schema_version=1, tool="zig-http-smoke-suite", ok=False,
+    receipt = dict(schema_version=1, tool="bounded-http-smoke-suite", ok=False,
                    classification="Python/client-bound smoke; not TechEmpower ranking, server capacity or SLO evidence",
                    warning="Short closed-loop loopback runs without warmup/repetitions; keep safety assertions enabled and compare only matching environments",
                    started_utc=datetime.now(timezone.utc).isoformat(), environment=None,

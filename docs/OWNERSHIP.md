@@ -46,7 +46,8 @@ place. One outstanding reservation or one borrowed payload is permitted, and
 borrowed and buffered payloads cannot be mixed in one flush snapshot.
 
 `borrow(bytes)` permits only immutable server-lifetime storage or bytes owned
-by the current request. `content_type` has the same lifetime rule. Small borrowed payloads may be copied into the bounded arena as described
+by the current request. `begin()` and `beginWithHeaders()` copy Content-Type during the call.
+Small borrowed payloads may be copied into the bounded arena as described
 below; callers must still honor this uniform lifetime contract. A callback's stack locals are invalid after return;
 external pool buffers cannot be reused merely because a callback returned.
 There is no application release notification after finish or cancellation, so
@@ -234,8 +235,9 @@ scalar switch exists for controlled comparison with the same ownership rules.
 
 The configured response-cell limit is 1–511, default 128; worker mode's
 effective limit is always 1. The scheduler dispatches the next buffered request
-into the same batch only while the arena keeps `header_reserve_bytes` free, so
-`begin()` never lacks head space. A reservation larger than the remaining arena
+into the same batch only while the arena keeps `callback_output_reserve` bytes free.
+The default remains `header_reserve_bytes`, so `begin()` has head space.
+A reservation larger than the remaining arena
 returns WouldBlock; the handler flushes and retries in an emptied arena, and
 `Writer.capacity()` names the body size that always fits after a flush.
 

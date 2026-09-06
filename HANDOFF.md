@@ -1,3 +1,40 @@
+# bounded/http rename handoff — 2026-09-06
+
+The user selected **bounded/http** as the public name.
+The byline is “for servers that stay within their bounds”.
+The whitepaper keeps “Fast by design. Explicit about limits.”
+
+The repository, canonical directory, executable, and HTTP Server token use `bounded-http`.
+The Zig package, embedding dependency, and exported module use `bounded_http`.
+The canonical repository is [technologylab-ai/bounded-http](https://github.com/technologylab-ai/bounded-http).
+The [published whitepaper](https://technologylab-ai.github.io/bounded-http/) uses the new project path.
+The [wiki design page](https://technologylab-ai.github.io/zigllmwiki/?page=wiki/bounded-http-server-design.md) records the same naming decision.
+
+Current commands and tooling use the new executable path.
+The comparison harness recognizes both current and historical implementation names.
+Archived measurements, report bytes, and pinned source identities retain `zig-http`.
+The displayed performance figures still describe those earlier binaries.
+The rename adds no throughput measurement or production qualification.
+
+The canonical Mac checkout is `../bounded-http`.
+The old `../zig-http` path remains a compatibility symlink for existing tools and active worktrees.
+Other agents own their existing worktrees; do not reset or rename those directories.
+Git worktree metadata remains reachable through the compatibility path.
+Update other clones with `git remote set-url origin git@github.com:technologylab-ai/bounded-http.git`.
+Keep `/tmp/zig-http-measurement.lock` unchanged on both hosts.
+Changing that shared path would let old and new agents run simultaneously.
+The existing Tailscale documentation server continues through the compatibility path.
+
+Verification and publication results are recorded in [the rename receipt](reports/2026-09-06-bounded-http-name.md).
+Mac development passed 78 tests per mode, two Linux-only skips, 84 wire cases, nine comparator checks, and 30,000 smoke responses.
+Seven HTTP and thirteen wiki browser checks passed.
+Linux publication verification remains pending the available reservation.
+Windows HTTP work has resumed separately on `feat/windows-iocp`.
+Remaining API, reliability, and performance work stays in [ROADMAP.md](ROADMAP.md).
+PR #1 merged at `c90281b600deb699a667e2bcc115da32862c794f` before the remaining source rename.
+Its response-draft API remains intact, and the whitepaper now explains reservation before callbacks.
+The older checkpoints below preserve their original names and evidence scope.
+
 # HTTP documentation handoff — 2026-09-06
 
 The architecture documentation is on main; preserve the earlier `docs/server-architecture` worktree.

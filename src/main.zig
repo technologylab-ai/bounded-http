@@ -27,9 +27,7 @@ fn requestControlStop() void {
     // publication. A late handler sees null; an earlier borrow must drain.
     _ = active_controls.fetchAdd(1, .seq_cst);
     defer _ = active_controls.fetchSub(1, .seq_cst);
-    if (active_cluster.load(.seq_cst)) |cluster| {
-        for (cluster.shards) |server| server.stop_requested.store(true, .release);
-    }
+    if (active_cluster.load(.seq_cst)) |cluster| cluster.requestStopFromSignal();
 }
 
 const Demo = struct { html: []const u8, stall_ms: u32, execution: framework.Execution };
@@ -44,7 +42,7 @@ pub fn main(init: std.process.Init) !void {
     _ = args.next();
     while (args.next()) |flag| {
         if (std.mem.eql(u8, flag, "--help")) {
-            std.debug.print("zig-http: bounded experimental Linux io_uring / macOS kqueue / Windows IOCP HTTP/1.1\n" ++
+            std.debug.print("bounded-http: bounded experimental Linux io_uring / macOS kqueue / Windows IOCP HTTP/1.1\n" ++
                 "--port N --connections N --execution workers|inline --workers N --max-body N --max-header N\n" ++
                 "--timeout-ms N --duration-ms N --send-chunk N --gather-send 0|1 --stall-ms N\n" ++
                 "--response-batch-limit N --socket-send-buffer N --output-bytes N --max-response N --memory-budget N --index FILE\n" ++

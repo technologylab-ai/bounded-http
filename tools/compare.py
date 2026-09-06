@@ -38,6 +38,34 @@ def require(condition, message):
         raise RuntimeError(message)
 
 
+def is_framework(server):
+    """Apply framework checks to current and historical comparison identities."""
+    return server.get('implementation', server.get('name')) in ('bounded-http', 'zig-http')
+
+
+def validate_framework_ready(server, log):
+    if not is_framework(server):
+        return
+    require('READY ' in log, 'framework READY missing')
+    require('optimize=ReleaseSafe' in log, 'benchmark requires ReleaseSafe')
+
+
+def parse_framework_stats(server, exit_code, log):
+    if not is_framework(server):
+        return None
+    records = [json.loads(line[6:]) for line in log.splitlines() if line.startswith('STATS ')]
+    require(exit_code == 0 and len(records) == 1, 'framework shutdown failed')
+    stats = records[0]
+    if server.get('expected_execution'):
+        require(stats['execution'] == server['expected_execution'], 'wrong execution mode')
+    if stats.get('execution') == 'inline_event_loop':
+        require(stats['workers'] == stats['worker_dispatches'] == 0, 'inline worker activity')
+    require(stats['allocation_calls_after_start'] == 0, 'late framework allocation')
+    require(stats['live_connections'] == stats['live_operations'] == 0, 'live shutdown ownership')
+    require(stats['peak_connections'] <= 128, 'connection limit exceeded')
+    return stats
+
+
 def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -249,7 +277,7 @@ def main():
     jobs = trial_jobs(config['servers'], args.connections, args.pipelines,
                       args.repeats, args.seed, args.order)
     args.output.mkdir(parents=True, exist_ok=False)
-    receipt = dict(schema_version=1, tool='zig-http-wrk-comparison', ok=False,
+    receipt = dict(schema_version=1, tool='bounded-http-wrk-comparison', ok=False,
                    started_utc=datetime.now(timezone.utc).isoformat(), configuration=config,
                    harness_sha256=digest(__file__), lua_sha256=digest(ROOT / 'benchmarks/pipeline.lua'),
                    configuration_sha256=digest(args.configuration), wrk_sha256=digest(config['wrk']),
@@ -299,11 +327,11 @@ def main():
                         except OSError:
                             require(time.monotonic() < deadline, 'startup watchdog')
                             time.sleep(.05)
-                    if server.get('implementation', server['name']) == 'zig-http':
+                    if is_framework(server):
                         while 'READY ' not in logpath.read_text():
                             require(process.poll() is None and time.monotonic() < deadline, 'READY watchdog')
                             time.sleep(.02)
-                        require('optimize=ReleaseSafe' in logpath.read_text(), 'benchmark requires ReleaseSafe')
+                        validate_framework_ready(server, logpath.read_text())
                     trial['preflight'] = preflight(server.get('port', 8080), server['body'].encode(), pipeline)
                     root_pid = int(capture(server['pid_command'])) if server.get('pid_command') else process.pid
                     trial['root_pid'] = root_pid
@@ -358,17 +386,10 @@ def main():
                             raise
                     trial['server_exit'] = process.returncode
                     trial['server_log'] = logpath.read_text()
-                    if server.get('implementation', server['name']) == 'zig-http' and pending_error is None:
-                        stats = [json.loads(line[6:]) for line in trial['server_log'].splitlines() if line.startswith('STATS ')]
-                        require(process.returncode == 0 and len(stats) == 1, 'Zig shutdown failed')
-                        trial['stats'] = stats[0]
-                        if server.get('expected_execution'):
-                            require(stats[0]['execution'] == server['expected_execution'], 'wrong execution mode')
-                        if stats[0].get('execution') == 'inline_event_loop':
-                            require(stats[0]['workers'] == stats[0]['worker_dispatches'] == 0, 'inline worker activity')
-                        require(stats[0]['allocation_calls_after_start'] == 0, 'late framework allocation')
-                        require(stats[0]['live_connections'] == stats[0]['live_operations'] == 0, 'live shutdown ownership')
-                        require(stats[0]['peak_connections'] <= 128, 'connection limit exceeded')
+                    if pending_error is None:
+                        stats = parse_framework_stats(server, process.returncode, trial['server_log'])
+                        if stats is not None:
+                            trial['stats'] = stats
             (args.output / 'results.json').write_text(json.dumps(receipt, indent=2) + '\n')
             print(json.dumps(dict(index=index, total=len(jobs), server=server['name'], c=connections, p=pipeline,
                                   rps=round(trial['result']['responses_per_second']),

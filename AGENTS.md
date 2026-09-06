@@ -1,4 +1,9 @@
-# Bounded Zig HTTP MVP
+# bounded/http agent contract
+
+Use **bounded/http** in prose and page branding.
+Use `bounded-http` for the repository, directory, executable, and HTTP Server token.
+Use `bounded_http` for the Zig package, dependency key, and module.
+Preserve historical evidence names and the shared `/tmp/zig-http-measurement.lock` path.
 
 Use exact Zig 0.16.0 from `.zig-version`. This standalone M4 implementation is
 informed by `../zigllmwiki`; runnable server code belongs here under `src/` and

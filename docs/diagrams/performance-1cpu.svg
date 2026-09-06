@@ -240,10 +240,10 @@
    </g>
    <g id="performance-1cpu-legend_1">
     <g id="performance-1cpu-patch_9">
-     <path d="M 503.187812 68.786424  L 525.187812 68.786424  L 525.187812 61.086424  L 503.187812 61.086424  z " style="fill: #d94b2b" />
+     <path d="M 477.731406 68.786424  L 499.731406 68.786424  L 499.731406 61.086424  L 477.731406 61.086424  z " style="fill: #d94b2b" />
     </g>
     <g id="performance-1cpu-text_20">
-     <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="533.987812" y="68.786424" transform="rotate(-0 533.987812 68.786424)">Zig HTTP</text>
+     <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="508.531406" y="68.786424" transform="rotate(-0 508.531406 68.786424)">bounded/http</text>
     </g>
     <g id="performance-1cpu-patch_10">
      <path d="M 605.207656 68.786424  L 627.207656 68.786424  L 627.207656 61.086424  L 605.207656 61.086424  z " style="fill: #172f40" />
@@ -268,4 +268,4 @@
    <rect x="93.6" y="82.944" width="604.8" height="196.992" />
   </clipPath>
  </defs>
-<title id="performance-1cpu-title">One allowed server CPU</title><desc id="performance-1cpu-desc">Depth 1: zig-http median 0.364447 million responses/s; range 0.362423 to 0.366211. Depth 16: zig-http median 3.404295 million responses/s; range 3.360874 to 3.412642. Depth 128: zig-http median 8.653315 million responses/s; range 6.887168 to 8.707278. Depth 1: libreactor median 0.329510 million responses/s; range 0.329350 to 0.330812. Depth 16: libreactor median 4.374097 million responses/s; range 4.280703 to 4.452351. Depth 128: libreactor median 14.517670 million responses/s; range 14.417633 to 14.602107.</desc></svg>
+<title id="performance-1cpu-title">One allowed server CPU</title><desc id="performance-1cpu-desc">Depth 1: bounded/http (recorded as zig-http) median 0.364447 million responses/s; range 0.362423 to 0.366211. Depth 16: bounded/http (recorded as zig-http) median 3.404295 million responses/s; range 3.360874 to 3.412642. Depth 128: bounded/http (recorded as zig-http) median 8.653315 million responses/s; range 6.887168 to 8.707278. Depth 1: libreactor median 0.329510 million responses/s; range 0.329350 to 0.330812. Depth 16: libreactor median 4.374097 million responses/s; range 4.280703 to 4.452351. Depth 128: libreactor median 14.517670 million responses/s; range 14.417633 to 14.602107.</desc></svg>

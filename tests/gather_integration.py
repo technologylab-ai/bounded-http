@@ -116,7 +116,7 @@ def main():
     parser.add_argument("--json", type=Path)
     args = parser.parse_args()
     wire.require(1 <= args.timeout <= 300, "finite suite watchdog 1..300 seconds required")
-    receipt = dict(schema_version=1, tool="zig-http-gather-integration", ok=False,
+    receipt = dict(schema_version=1, tool="bounded-http-gather-integration", ok=False,
                    platform=sys.platform, server=str(args.server.resolve()), tests=[], sessions=[])
     started = time.monotonic()
 

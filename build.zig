@@ -20,7 +20,7 @@ pub fn build(b: *std.Build) void {
     const exe = b.addExecutable(.{
         .use_llvm = if (target.result.os.tag == .linux and optimize == .Debug) true else null,
         .use_lld = if (target.result.os.tag == .linux and optimize == .Debug) true else null,
-        .name = "zig-http",
+        .name = "bounded-http",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,

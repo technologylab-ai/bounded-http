@@ -1,4 +1,4 @@
-# Using the server
+# Using bounded/http
 
 Use the exported `bounded_http` module to embed the framework in a Zig application.
 Use exact Zig 0.16.0, as specified by [.zig-version](../.zig-version).
@@ -21,7 +21,7 @@ Run these commands from the repository root:
 zig version
 zig build verify -Doptimize=ReleaseSafe
 zig build -Doptimize=ReleaseSafe
-./zig-out/bin/zig-http --port 8080 --connections 128 --shards 1
+./zig-out/bin/bounded-http --port 8080 --connections 128 --shards 1
 ```
 
 The version command must print `0.16.0`.
@@ -50,7 +50,7 @@ Copy the example into your application project and change that dependency path t
 Keep the framework checkout pinned to a reviewed commit.
 
 The dependency name and imported module name serve different purposes.
-The example names the package dependency `zig_http`.
+The example names the package dependency `bounded_http`.
 The framework exports a module named `bounded_http`.
 The consumer obtains that module with `dependency.module("bounded_http")`.
 The consumer exposes it to its source as the `bounded_http` import.
@@ -205,11 +205,44 @@ The small-copy optimization does not weaken this application contract.
 Only the framework calls the writer's lifecycle methods, including `open()`, `release()`, and `resumeSnapshot()`.
 Application code uses `begin()`, body methods, `flush()`, and `finish()`.
 
+### Bounded response adapters
+
+A higher-level adapter can prepare an unpublished response before it commits headers.
+Set `Config.callback_output_reserve` to the adapter's complete scratch requirement before cluster initialization.
+The default remains `api.header_reserve_bytes` for ordinary callbacks.
+The owner drains older output before dispatch when the remaining arena cannot satisfy this requirement.
+The owner preserves the request and does not replay application side effects.
+
+The writer exposes three checked methods for these adapters:
+
+| Method | Contract |
+| --- | --- |
+| `draftStorage(required_bytes)` | Return the requested scratch range for a fresh response. Return an ordinary error for invalid state or insufficient space. |
+| `discardDraft()` | Reset only the current unpublished response. Preserve earlier frozen output. Reject a frozen or committed response. |
+| `writeDraftBody(bytes)` | Copy staged body bytes after `begin()`. Permit overlapping source and destination ranges. Count the copied bytes. |
+
+Call `draftStorage(0)` to check draft state without borrowing a nonempty range.
+Keep scratch access within the active callback and invalidate adapter metadata after discard.
+Do not call internal writer lifecycle methods or inspect writer fields from an external adapter.
+The `response_draft_copy_bytes` statistic counts staged body copies, including logical HEAD bodies.
+
+Use `beginWithHeaders(status, content_type, length, extra_headers)` to include additional response fields.
+Supply complete header lines with CRLF terminators.
+The writer validates names, values, reserved fields, and head capacity before mutation.
+Repeated fields remain separate lines.
+The writer copies Content-Type and additional headers synchronously during the successful call.
+Arena-backed arguments must use disjoint ranges after the current snapshot's `header_reserve_bytes` prefix.
+Header compaction can turn those original arena ranges into committed output.
+Do not overwrite arena-backed arguments after the call.
+The adapter must reserve additional header space through `callback_output_reserve`.
+
 ### Borrow lifetimes
 
 `borrow()` accepts current request storage or immutable assets that live for the entire server lifetime.
-The same lifetime rule applies to `begin()`'s `content_type` argument.
-Do not pass callback-local arrays or buffers that another component can recycle.
+Both `begin()` and `beginWithHeaders()` copy their `content_type` argument during the call.
+The caller can reuse external argument storage after a successful call.
+Arena-backed argument storage may now contain committed output and must remain unchanged.
+Do not pass callback-local arrays or recyclable buffers to `borrow()`.
 
 The default threshold copies eligible borrowed spans of at most 256 bytes when arena space permits.
 Larger borrowed spans remain outside the arena.
@@ -293,6 +326,7 @@ The [architecture guide](ARCHITECTURE.md#resource-boundaries) explains which res
 | `max_header` | 16,384 bytes | Bound the request line, headers, and shared trailer budget. |
 | `max_headers` | 64 | Bound the combined header and trailer count. |
 | `output_bytes` | 65,536 bytes | Reserve one output arena per slot. |
+| `callback_output_reserve` | 384 bytes | Reserve free output before initial callback dispatch; include complete scratch space for one-shot adapters. |
 | `response_batch_limit` | 128 | Bound retained response snapshots; worker execution uses one. |
 | `max_response_bytes` | 16 MiB | Bound logical response bytes across flushes. |
 | `callbacks_per_turn` | 0, automatic | Bound inline callbacks per owner turn. |
@@ -330,7 +364,9 @@ Keep shared application state immutable or synchronize it across concurrent call
 Keep each callback's temporary progress in its own `state` words where practical.
 
 An ordinary control thread can call `cluster.requestStop()` while the cluster remains alive.
-The reference signal handler instead sets atomic flags directly.
+Use `cluster.requestStopFromSignal()` for an atomic-only signal stop request.
+The helper performs no wake, allocation, logging, or other system call.
+Existing polling and callback-progress limits still apply.
 Do not introduce logging, allocation, or ordinary shutdown calls into that signal handler.
 
 Collect `cluster.stats()` after `run()` returns and owner threads have stopped.
