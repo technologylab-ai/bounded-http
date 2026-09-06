@@ -220,7 +220,8 @@ pub const Stats = struct {
     }
 };
 
-const Phase = enum(u8) { io, ready, running, result };
+// Only result ends the callback borrow. Both streaming phases retain its stack.
+const Phase = enum(u8) { io, ready, running, stream_ready, stream_wait, result };
 const SendMode = enum { response, interim, reject };
 const Kind = enum(u8) { accept = 1, recv, send, cancel_recv, cancel_send, cancel_accept };
 const accept_token: u64 = @intFromEnum(Kind.accept);
@@ -342,23 +343,7 @@ const Worker = struct {
         _ = self.server.ready_workers.fetchAdd(1, .release);
         defer _ = self.server.exited_workers.fetchAdd(1, .release);
         while (!self.server.stop_workers.load(.acquire)) {
-            // The phase owns work; finite waits make coalesced wakeups harmless.
-            if (builtin.os.tag == .windows) {
-                const result = win32.WaitForSingleObject(self.event.?, 10);
-                assert(result == 0 or result == 258); // signaled or timeout
-            } else {
-                var ready = [_]c.pollfd{.{ .fd = self.read_fd, .events = c.POLL.IN, .revents = 0 }};
-                const polled = c.poll(&ready, 1, 10);
-                if (polled < 0) {
-                    assert(c.errno(polled) == .INTR);
-                    continue;
-                }
-                if (polled > 0) {
-                    var bytes: [64]u8 = undefined;
-                    const read = c.read(self.read_fd, &bytes, bytes.len);
-                    assert(read > 0 or (read < 0 and c.errno(read) == .INTR));
-                }
-            }
+            self.wait();
             if (self.server.stop_workers.load(.acquire)) break;
             var index = self.index;
             while (index < self.server.slots.len) : (index += self.server.workers.len) {
@@ -367,6 +352,26 @@ const Worker = struct {
                     continue;
                 self.server.invokeHandler(slot);
                 self.server.backend.wake();
+            }
+        }
+    }
+
+    fn wait(self: *Worker) void {
+        // The phase owns work; finite waits make coalesced wakeups harmless.
+        if (builtin.os.tag == .windows) {
+            const result = win32.WaitForSingleObject(self.event.?, 10);
+            assert(result == 0 or result == 258); // signaled or timeout
+        } else {
+            var ready = [_]c.pollfd{.{ .fd = self.read_fd, .events = c.POLL.IN, .revents = 0 }};
+            const polled = c.poll(&ready, 1, 10);
+            if (polled < 0) {
+                assert(c.errno(polled) == .INTR);
+                return;
+            }
+            if (polled > 0) {
+                var bytes: [64]u8 = undefined;
+                const read = c.read(self.read_fd, &bytes, bytes.len);
+                assert(read > 0 or (read < 0 and c.errno(read) == .INTR));
             }
         }
     }
@@ -693,7 +698,9 @@ pub const Server = struct {
 
     fn anyResult(self: *Server) bool {
         for (self.slots) |*slot| {
-            if (slot.in_use and slot.phase.load(.acquire) == .result) return true;
+            if (!slot.in_use) continue;
+            const phase = slot.phase.load(.acquire);
+            if (phase == .result or phase == .stream_ready) return true;
         }
         return false;
     }
@@ -721,7 +728,21 @@ pub const Server = struct {
                 }
                 self.invokeInline(slot);
             }
-            if (slot.phase.load(.acquire) != .result) break;
+            const phase = slot.phase.load(.acquire);
+            if (phase == .stream_ready) {
+                assert(self.config.execution == .workers and slot.action == .flush);
+                // The worker still owns its stack, request and application state.
+                // Only the frozen writer snapshot transfers to the I/O owner.
+                slot.phase.store(.stream_wait, .release);
+                if (slot.closing or self.stop_requested.load(.acquire) or self.now >= slot.deadline) {
+                    if (!slot.closing and !self.stop_requested.load(.acquire)) self.stats.timeouts += 1;
+                    try self.beginClose(slot);
+                } else {
+                    try self.prepareResponse(index, false);
+                }
+                break;
+            }
+            if (phase != .result) break;
             if (self.config.callback_timing) {
                 self.stats.max_handler_ns = @max(self.stats.max_handler_ns, slot.handler_ns);
                 self.stats.max_queue_ns = @max(self.stats.max_queue_ns, slot.queue_ns);
@@ -1168,6 +1189,7 @@ pub const Server = struct {
         if (slot.cancelled.load(.acquire)) {
             slot.action = .close;
         } else {
+            var streaming: WorkerFlush = .{ .server = self, .slot = slot };
             var context: api.Context = .{
                 .request = &slot.request,
                 .writer = &slot.writer,
@@ -1175,13 +1197,41 @@ pub const Server = struct {
                 .state = &slot.state,
                 .application = self.application,
                 .cancelled = &slot.cancelled,
+                .blocking_flush = if (self.config.execution == .workers) .{
+                    .context = &streaming,
+                    .flush = WorkerFlush.flush,
+                } else null,
             };
             slot.action = self.handler(&context);
             if (slot.action != .close) assert(slot.writer.frozen);
         }
         if (timing) slot.handler_ns = nowNs() - started;
+        assert(slot.phase.load(.acquire) == .running);
         slot.phase.store(.result, .release);
     }
+
+    /// This frame lives on the startup worker stack until the handler returns.
+    const WorkerFlush = struct {
+        server: *Server,
+        slot: *Slot,
+
+        fn flush(pointer: *anyopaque) api.FlushError!void {
+            const self: *WorkerFlush = @ptrCast(@alignCast(pointer));
+            const slot = self.slot;
+            assert(self.server.config.execution == .workers);
+            assert(slot.phase.load(.acquire) == .running and slot.writer.frozen);
+            const index = (@intFromPtr(slot) - @intFromPtr(self.server.slots.ptr)) / @sizeOf(Slot);
+            const worker = &self.server.workers[index % self.server.workers.len];
+            slot.action = .flush;
+            slot.phase.store(.stream_ready, .release);
+            self.server.backend.wake();
+            // Cancellation alone cannot return output or input ownership.
+            // Success releases output borrows. Cancellation releases all kernel borrows.
+            while (slot.phase.load(.acquire) != .running) worker.wait();
+            if (slot.cancelled.load(.acquire)) return error.Cancelled;
+            assert(!slot.writer.frozen and slot.writer.headers_committed);
+        }
+    };
 
     fn reject(self: *Server, index: usize, status: u16) !void {
         const slot = &self.slots[index];
@@ -1426,7 +1476,13 @@ pub const Server = struct {
                 slot.writer.resumeSnapshot(0);
                 slot.event = .flushed;
                 self.stats.resumed += 1;
-                self.dispatch(index);
+                if (slot.phase.load(.acquire) == .stream_wait) {
+                    assert(self.config.execution == .workers);
+                    slot.phase.store(.running, .release);
+                    self.workers[index % self.workers.len].wake();
+                } else {
+                    self.dispatch(index);
+                }
             },
             .close => try self.beginClose(slot),
             .parse => {
@@ -1482,9 +1538,18 @@ pub const Server = struct {
 
     fn maybeFree(self: *Server, slot: *Slot) void {
         if (!slot.closing or slot.recv_pending or slot.send_pending or
-            slot.recv_cancel_pending or slot.send_cancel_pending or
-            slot.phase.load(.acquire) != .io) return;
+            slot.recv_cancel_pending or slot.send_cancel_pending) return;
         const index = (@intFromPtr(slot) - @intFromPtr(self.slots.ptr)) / @sizeOf(Slot);
+        const phase = slot.phase.load(.acquire);
+        if (phase == .stream_wait) {
+            assert(self.config.execution == .workers and slot.cancelled.load(.acquire));
+            // Kernel borrows ended, but the same callback must still unwind.
+            // Keep the writer frozen because cancellation forbids more output.
+            slot.phase.store(.running, .release);
+            self.workers[index % self.workers.len].wake();
+            return;
+        }
+        if (phase != .io) return;
         if (slot.fd >= 0) {
             self.backend.close(self.recvCell(index), slot.fd);
             slot.fd = -1;
@@ -1503,6 +1568,137 @@ pub const Server = struct {
         assert(self.free_count < self.free_slots.len);
         self.free_slots[self.free_count] = @intCast(index);
         self.free_count += 1;
+    }
+
+    test "blocking flush resumes the same stack and preserves the request deadline" {
+        const server = try Server.init(std.testing.allocator, .{
+            .execution = .workers,
+            .workers = 1,
+            .connections = 1,
+            .port = 0,
+        }, struct {
+            fn handler(_: *api.Context) api.Action {
+                @panic("blocking flush must not invoke the handler again");
+            }
+        }.handler, null);
+        defer server.deinit();
+        const slot = &server.slots[0];
+        defer slot.phase.store(.io, .release);
+        server.header_cache.refresh("Sat, 05 Sep 2026 12:34:56 GMT");
+        for ([_]bool{ false, true }) |head_only| {
+            slot.writer.open(0, true, head_only);
+            try slot.writer.begin(200, "text/plain", null);
+            _ = slot.writer.flush();
+            slot.writer.headers_committed = true;
+            slot.request_active = true;
+            slot.request_started = 123;
+            slot.deadline = 123 + @as(u64, server.config.timeout_ms) * 1_000_000;
+            const deadline = slot.deadline;
+            server.now = 456;
+            slot.phase.store(.stream_wait, .release);
+            slot.batch_next = .resume_flush;
+            slot.cells[0] = .{};
+            slot.batch_count = 1;
+            slot.part_count = 0;
+            slot.part = 0;
+            try server.completeBatch(0);
+            try std.testing.expectEqual(Phase.running, slot.phase.load(.acquire));
+            try std.testing.expectEqual(deadline, slot.deadline);
+            try std.testing.expect(!slot.writer.frozen and slot.request_active);
+            try std.testing.expectEqual(@as(usize, 0), slot.writer.bodyBytes());
+            try std.testing.expectEqual(@as(u64, 0), server.stats.worker_dispatches);
+            // A second empty flush completes without submitting a send.
+            _ = slot.writer.flush();
+            slot.phase.store(.stream_wait, .release);
+            slot.batch_count = 1;
+            try server.completeBatch(0);
+            try std.testing.expectEqual(Phase.running, slot.phase.load(.acquire));
+            try std.testing.expectEqual(deadline, slot.deadline);
+        }
+        try std.testing.expectEqual(@as(u64, 4), server.stats.resumed);
+    }
+
+    test "cancelled flush retains kernel borrows and the callback until its final result" {
+        const server = try Server.init(std.testing.allocator, .{
+            .execution = .workers,
+            .workers = 1,
+            .connections = 1,
+            .port = 0,
+        }, struct {
+            fn handler(_: *api.Context) api.Action {
+                return .close;
+            }
+        }.handler, null);
+        defer server.deinit();
+        const slot = &server.slots[0];
+        defer {
+            slot.phase.store(.io, .release);
+            server.stats.live_connections = 0;
+        }
+        slot.in_use = true;
+        slot.closing = true;
+        slot.cancelled.store(true, .release);
+        slot.phase.store(.stream_wait, .release);
+        server.stats.live_connections = 1;
+        server.free_count = 0;
+        inline for (.{ "recv_pending", "send_pending", "recv_cancel_pending", "send_cancel_pending" }) |field| {
+            @field(slot, field) = true;
+            server.maybeFree(slot);
+            try std.testing.expectEqual(Phase.stream_wait, slot.phase.load(.acquire));
+            try std.testing.expect(slot.in_use and server.free_count == 0);
+            @field(slot, field) = false;
+        }
+        server.maybeFree(slot);
+        try std.testing.expectEqual(Phase.running, slot.phase.load(.acquire));
+        try std.testing.expect(slot.in_use and server.free_count == 0);
+        // Cancellation releases kernel ownership, but the callback can still unwind.
+        server.maybeFree(slot);
+        try std.testing.expectEqual(@as(usize, 1), server.stats.live_connections);
+        slot.action = .close;
+        slot.phase.store(.result, .release);
+        try server.serviceSlot(0);
+        try std.testing.expect(!slot.in_use);
+        try std.testing.expectEqual(@as(usize, 1), server.free_count);
+        try std.testing.expectEqual(@as(usize, 0), server.stats.live_connections);
+    }
+
+    test "blocking flush applies cumulative response bounds before transmission" {
+        const server = try Server.init(std.testing.allocator, .{
+            .execution = .workers,
+            .workers = 1,
+            .connections = 1,
+            .port = 0,
+            .max_response_bytes = 4,
+        }, struct {
+            fn handler(_: *api.Context) api.Action {
+                return .close;
+            }
+        }.handler, null);
+        defer server.deinit();
+        const slot = &server.slots[0];
+        defer {
+            slot.phase.store(.io, .release);
+            server.stats.live_connections = 0;
+        }
+        server.header_cache.refresh("Sat, 05 Sep 2026 12:34:56 GMT");
+        slot.in_use = true;
+        slot.request_active = true;
+        slot.deadline = 100;
+        slot.logical_written = 3;
+        server.stats.live_connections = 1;
+        server.free_count = 0;
+        slot.writer.open(0, true, false);
+        try slot.writer.begin(200, "text/plain", null);
+        try slot.writer.write("ab");
+        slot.action = slot.writer.flush();
+        slot.phase.store(.stream_ready, .release);
+        try server.serviceSlot(0);
+        try std.testing.expect(slot.cancelled.load(.acquire));
+        try std.testing.expectEqual(Phase.running, slot.phase.load(.acquire));
+        try std.testing.expect(slot.in_use and slot.writer.frozen);
+        try std.testing.expectEqual(@as(usize, 3), slot.logical_written);
+        try std.testing.expectEqual(@as(usize, 0), server.stats.live_operations);
+        try std.testing.expectEqual(@as(u64, 0), server.stats.bytes_sent);
     }
 
     test "worker response headers retain their exclusive dispatch snapshot" {
