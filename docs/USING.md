@@ -293,6 +293,41 @@ Return that result immediately.
 The owner completes response framing without another callback for that response.
 Finished responses can remain buffered within a batch before transmission.
 
+### Timers and cancellation callbacks
+
+`return try context.wait(delay_ns)` ends the current callback and releases its worker.
+The scheduler uses its monotonic clock and fixed slot storage.
+The handler receives `.timer` after the requested delay.
+The scheduler can deliver a timer late; the existing poll interval is at most 10 milliseconds.
+Application work and scheduler load can add delay.
+The timer does not extend the original request deadline.
+A zero delay still yields through the scheduler.
+
+Call `wait` before beginning a response, or after a completed flush with an empty output snapshot.
+The method rejects pending output, reservations, borrowed payloads, and cancellation.
+The scheduler drains earlier finished responses before waiting on a subsequent pipeline request.
+The application must retain its state between callbacks.
+The application must not retain callback Context pointers.
+
+Call `context.requestCancellation()` before returning a flush or wait action that retains application state.
+Cancellation then schedules one `.cancelled` callback after application and kernel borrows return.
+The callback runs on the configured worker or inline executor.
+The request and eight state words remain available during cleanup.
+The writer is frozen, and blocking flush is unavailable.
+The callback must release retained state and return `.close`.
+The scheduler ignores other actions from this cleanup callback.
+Shutdown drains these callbacks before stopping workers or freeing slots.
+
+A handler must release its own state before returning `.finish` or `.close`.
+Those actions never receive an additional cancellation callback, including cancellation races during result publication.
+State, locals, and recycled application buffers remain ineligible for output borrowing.
+This API does not provide a dynamic output lease or a successful-send finalizer.
+
+`tests/continuation_integration.py` checks timers, partial output, depth-128 pipelines, cancellation, slot reuse, and shutdown.
+The worker fixture admits 32 waiting requests with one worker.
+The multi-owner fixture runs on Linux and Windows; macOS supports one owner.
+These fixtures establish correctness, not a performance comparison.
+
 ### Flush within a worker callback
 
 `Context.supportsBlockingFlush()` reports whether the callback runs on a fixed application worker.

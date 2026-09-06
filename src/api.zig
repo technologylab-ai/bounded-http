@@ -2,8 +2,8 @@ const std = @import("std");
 pub const http = @import("http.zig");
 const assert = std.debug.assert;
 
-pub const Action = enum { flush, finish, close };
-pub const Event = enum { request, flushed };
+pub const Action = enum { flush, finish, close, wait };
+pub const Event = enum { request, flushed, timer, cancelled };
 pub const Handler = *const fn (*Context) Action;
 pub const FlushError = error{ BlockingFlushUnavailable, InvalidState, Cancelled };
 
@@ -17,6 +17,29 @@ pub const Context = struct {
     cancelled: *const std.atomic.Value(bool),
     /// The scheduler supplies this hook only for an existing application worker.
     blocking_flush: ?BlockingFlush = null,
+    /// Internal callback result metadata. Use requestCancellation() and wait().
+    notify_cancel: bool = false,
+    resume_after_ns: ?u64 = null,
+
+    /// Request one cancellation callback if this callback returns flush or wait.
+    /// Cancellation runs on the configured application executor after kernel borrows end.
+    /// Its writer is unavailable. Return close after releasing application state.
+    /// Finish and close require local cleanup and never receive this callback.
+    pub fn requestCancellation(self: *Context) void {
+        self.notify_cancel = true;
+    }
+
+    /// Return this action to release the worker until a monotonic timer expires.
+    /// The original request deadline still applies. Wakeups can arrive late.
+    /// Publish pending response bytes with flush before waiting.
+    pub fn wait(self: *Context, delay_ns: u64) error{ InvalidState, Cancelled }!Action {
+        if (self.cancelled.load(.acquire)) return error.Cancelled;
+        if (self.writer.frozen or self.writer.reserved != 0 or self.writer.borrowed != null or
+            (self.writer.began and (!self.writer.headers_committed or self.writer.bodyBytes() != 0)))
+            return error.InvalidState;
+        self.resume_after_ns = delay_ns;
+        return .wait;
+    }
 
     pub const BlockingFlush = struct {
         context: *anyopaque,
@@ -713,4 +736,33 @@ test "draft header aliases copy before storage is reused and preserve repeated f
     _ = writer.finish();
     try std.testing.expect(std.mem.indexOf(u8, arena[0..writer.body_start], "Content-Type: application/example\r\n") != null);
     try std.testing.expect(std.mem.endsWith(u8, arena[0..writer.body_start], fields ++ "\r\n"));
+}
+
+test "timer waits reject output ownership and cancellation without publication" {
+    var arena: [1024]u8 = undefined;
+    const cache = testCache();
+    var writer = Writer.init(&arena, &cache, 0);
+    writer.open(0, true, false);
+    var request: http.Request = undefined;
+    var state: [8]usize = @splat(0);
+    var cancelled: std.atomic.Value(bool) = .init(false);
+    var context: Context = .{ .request = &request, .writer = &writer, .event = .request, .state = &state, .application = null, .cancelled = &cancelled };
+    context.requestCancellation();
+    try std.testing.expect(context.notify_cancel);
+    try std.testing.expectEqual(Action.wait, try context.wait(0));
+    try std.testing.expectEqual(@as(?u64, 0), context.resume_after_ns);
+    try writer.begin(200, "text/plain", null);
+    try std.testing.expectError(error.InvalidState, context.wait(1));
+    _ = writer.flush();
+    try std.testing.expectError(error.InvalidState, context.wait(1));
+    writer.headers_committed = true;
+    writer.release();
+    writer.resumeSnapshot(0);
+    try std.testing.expectEqual(Action.wait, try context.wait(std.math.maxInt(u64)));
+    _ = try writer.reserve(1);
+    try std.testing.expectError(error.InvalidState, context.wait(1));
+    writer.commit(1);
+    try std.testing.expectError(error.InvalidState, context.wait(1));
+    cancelled.store(true, .release);
+    try std.testing.expectError(error.Cancelled, context.wait(1));
 }

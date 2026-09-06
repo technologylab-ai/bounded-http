@@ -146,6 +146,11 @@ means the local socket accepted the bytes; it does not prove peer receipt.
 `return writer.finish()` sends the remaining bytes and completes HTTP framing,
 without another application callback. No later writes belong to that response.
 
+`return try context.wait(delay_ns)` releases the callback until a monotonic timer expires.
+The handler resumes with `.timer`; the original request deadline still applies.
+Applications can [request cancellation callbacks](docs/USING.md#timers-and-cancellation-callbacks) to release retained state after abandoned waits or flushes.
+These callbacks run on the configured application executor after kernel borrows return.
+
 `borrow` requires request-owned input or immutable server-lifetime storage.
 `begin` copies its `content_type` argument during the call.
 There is no dynamic lease-release callback
