@@ -346,7 +346,7 @@ def run(binary, emit, sessions):
     # Zig 0.16 readFileAlloc's .limited(65536) bound is exclusive.
     asset_bytes = 65535
     pipeline_depth = 16
-    with tempfile.TemporaryDirectory(prefix="zig-http-batch-cancel-") as directory:
+    with tempfile.TemporaryDirectory(prefix="bounded-http-batch-cancel-") as directory:
         asset = Path(directory) / "index.html"
         asset.write_bytes(b"a" * asset_bytes)
         with BatchServer(binary, connections=2, index=asset, timeout_ms=1000,
@@ -400,12 +400,12 @@ def run(binary, emit, sessions):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--server", type=Path, default=wire.ROOT / "zig-out/bin/zig-http")
+    parser.add_argument("--server", type=Path, default=wire.ROOT / "zig-out/bin/bounded-http")
     parser.add_argument("--timeout", type=int, default=120)
     parser.add_argument("--json", type=Path)
     args = parser.parse_args()
     wire.require(1 <= args.timeout <= 300, "finite suite watchdog required")
-    receipt = dict(schema_version=1, tool="zig-http-batch-integration", ok=False,
+    receipt = dict(schema_version=1, tool="bounded-http-batch-integration", ok=False,
                    platform=sys.platform, server=str(args.server.resolve()), tests=[], sessions=[])
     started = time.monotonic()
     def watchdog(number, frame):

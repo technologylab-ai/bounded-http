@@ -10,7 +10,7 @@ OpenSSL 3.6.3, and Zig 0.16.0. This generalized script preserves those source pi
 and optimization flags; it records the actual installed native compiler and
 OpenSSL rather than assuming their versions or promising identical binaries.
 
-The generalized script itself passed a complete run from commit
+The preceding script passed a complete run from commit
 `b8a3afe1bcfd7dd933060e1064cab55c4f7a41c3` on `omarx1`, September 5, 2026,
 16:33:49–16:34:45 UTC. All 67 recorded commands succeeded, including the offline
 mrpacker legacy install and exact Zig 0.16.0 ReleaseSafe build. No server or load
@@ -26,23 +26,23 @@ are required: three server CPUs and at least four client CPUs. Check physical
 topology before interpreting this as a physical-core allocation. The script
 installs no system packages. Docker may populate its normal image cache.
 
-Create a fresh directory with `mktemp -d /tmp/zig-http-compare.XXXXXX` on the Linux
-host. Place a clean archive of the chosen full commit in its `zig-http/` child
+Create a fresh directory with `mktemp -d /tmp/bounded-http-compare.XXXXXX` on the Linux
+host. Place a clean archive of the chosen full commit in its `bounded-http/` child
 directory using `git archive <full-commit>`, not a copy containing uncommitted
 source edits. The archived commit must contain this preparation directory and
 the comparison harness. Run the following **on that Linux host**, substituting
 the created directory and the actual full archived commit:
 
 ```sh
-python3 /tmp/zig-http-compare.XXXXXX/zig-http/benchmarks/prepare/prepare.py \
-  /tmp/zig-http-compare.XXXXXX --commit FULL_40_CHARACTER_COMMIT --check
-python3 /tmp/zig-http-compare.XXXXXX/zig-http/benchmarks/prepare/prepare.py \
-  /tmp/zig-http-compare.XXXXXX --commit FULL_40_CHARACTER_COMMIT
+python3 /tmp/bounded-http-compare.XXXXXX/bounded-http/benchmarks/prepare/prepare.py \
+  /tmp/bounded-http-compare.XXXXXX --commit FULL_40_CHARACTER_COMMIT --check
+python3 /tmp/bounded-http-compare.XXXXXX/bounded-http/benchmarks/prepare/prepare.py \
+  /tmp/bounded-http-compare.XXXXXX --commit FULL_40_CHARACTER_COMMIT
 ```
 
 Defaults are `--server-cpus 0,1,2 --client-cpus 3,4,5,6,7`. Explicit lists may select
 other available CPUs. The root must be canonical, owned by the caller, and match
-the `/tmp/zig-http-compare.<suffix>` form. Existing preparation outputs cause a
+the `/tmp/bounded-http-compare.<suffix>` form. Existing preparation outputs cause a
 refusal; partial preparations are retained for diagnosis. The script never deletes
 an existing checkout or temporary root. The `--commit` value is caller attestation
 of the archive command, not an independent proof that arbitrary supplied files
@@ -59,6 +59,10 @@ matching the current default. Its `expected_execution` receipt check requires
 The generated configuration retains a three-CPU server affinity budget for all
 contenders. A separate one-CPU comparison must explicitly change that budget and
 the mrhttp worker count together before measurement.
+New configurations identify the framework as `bounded-http`.
+The comparison harness also recognizes historical `zig-http` identities and retains their validation checks.
+Preserve the shared `/tmp/zig-http-measurement.lock` reservation path.
+The retained `/tmp/zig-http-compare.PIwh35` directory belongs to earlier experiments.
 Each subprocess has a finite timeout (normally 300 seconds, 600 for the image
 pull), and the whole preparation has a one-hour watchdog. Interrupted native
 commands terminate their owned process groups. The install container has a unique

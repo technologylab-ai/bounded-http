@@ -1,4 +1,4 @@
-# Documentation map
+# bounded/http documentation
 
 Read the [architecture guide](ARCHITECTURE.md) for concepts, startup order, ownership, resource accounting, and shutdown.
 Read the [integration guide](USING.md) to embed the framework and implement callbacks.
@@ -40,7 +40,7 @@ Code identifiers and exact-format text remain exempt.
 
 ## Read and publish on the web
 
-The [public site](https://technologylab-ai.github.io/zig-http/) serves the whitepaper and its architecture and integration guides.
+The [public site](https://technologylab-ai.github.io/bounded-http/) serves the whitepaper and its architecture and integration guides.
 The browser reader renders Markdown, tables, heading links, diagrams, and highlighted code.
 Source and evidence links open the public GitHub repository at the deployment revision.
 Wiki navigation opens the [standalone wiki reader](https://technologylab-ai.github.io/zigllmwiki/).
@@ -75,3 +75,16 @@ The reader vendors Marked, DOMPurify, and Highlight.js.
 Adjacent license files preserve each dependency's license terms.
 The site uses no external script or stylesheet service.
 The Zig highlighting rules follow the exact 0.16.0 tokenizer keywords.
+
+## Project names
+
+Use **bounded/http** as the public name.
+Use `bounded-http` for repository, directory, executable, and HTTP product names.
+Use `bounded_http` for Zig package, dependency, and module names.
+The byline is “for servers that stay within their bounds”.
+Keep the headline “Fast by design. Explicit about limits.”
+
+Historical measurements identify the server as `zig-http`.
+Preserve their raw keys, source revisions, archived binaries, and recorded paths.
+Figure labels use the current brand, with the earlier measurement name stated explicitly.
+The shared measurement lock retains `/tmp/zig-http-measurement.lock` while both names coexist.

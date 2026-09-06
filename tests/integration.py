@@ -226,7 +226,8 @@ def plaintext(server):
     require(status == 200 and body == PLAINTEXT, "plaintext status/body mismatch")
     require(headers.get(b"content-length") == b"13", "plaintext length mismatch")
     require(headers.get(b"content-type", b"").startswith(b"text/plain"), "plaintext content type missing")
-    require(b"date" in headers and b"server" in headers, "Date and Server headers required for baseline")
+    require(b"date" in headers, "Date header required for baseline")
+    require(headers.get(b"server") == b"bounded-http", "Server product token mismatch")
 
 
 def expect_closed(sock):
@@ -474,13 +475,13 @@ def run_suite(binary, emit, sessions):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--server", type=Path, default=ROOT / "zig-out/bin/zig-http")
+    parser.add_argument("--server", type=Path, default=ROOT / "zig-out/bin/bounded-http")
     parser.add_argument("--timeout", type=int, default=90, help="whole-suite watchdog seconds")
     parser.add_argument("--json", type=Path, help="also save the final JSON receipt")
     args = parser.parse_args()
     require(args.timeout > 0, "positive watchdog required")
     results = []
-    receipt = dict(schema_version=1, tool="zig-http-integration", ok=False,
+    receipt = dict(schema_version=1, tool="bounded-http-integration", ok=False,
                    server=str(args.server.resolve()), platform=sys.platform,
                    python=sys.version.split()[0], tests=results, sessions=[])
 

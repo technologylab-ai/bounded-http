@@ -1,4 +1,4 @@
-# Using the server
+# Using bounded/http
 
 Use the exported `bounded_http` module to embed the framework in a Zig application.
 Use exact Zig 0.16.0, as specified by [.zig-version](../.zig-version).
@@ -21,7 +21,7 @@ Run these commands from the repository root:
 zig version
 zig build verify -Doptimize=ReleaseSafe
 zig build -Doptimize=ReleaseSafe
-./zig-out/bin/zig-http --port 8080 --connections 128 --shards 1
+./zig-out/bin/bounded-http --port 8080 --connections 128 --shards 1
 ```
 
 The version command must print `0.16.0`.
@@ -50,7 +50,7 @@ Copy the example into your application project and change that dependency path t
 Keep the framework checkout pinned to a reviewed commit.
 
 The dependency name and imported module name serve different purposes.
-The example names the package dependency `zig_http`.
+The example names the package dependency `bounded_http`.
 The framework exports a module named `bounded_http`.
 The consumer obtains that module with `dependency.module("bounded_http")`.
 The consumer exposes it to its source as the `bounded_http` import.

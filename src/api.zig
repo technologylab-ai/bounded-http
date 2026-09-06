@@ -59,7 +59,7 @@ pub const HeaderCache = struct {
     ok_prefix: [80]u8 = undefined,
     ok_prefix_len: usize = 0,
 
-    const ok_head = "HTTP/1.1 200 OK\r\nServer: zig-http\r\nDate: ";
+    const ok_head = "HTTP/1.1 200 OK\r\nServer: bounded-http\r\nDate: ";
 
     pub fn refresh(self: *HeaderCache, date: *const [29]u8) void {
         self.date = date.*;
@@ -302,7 +302,7 @@ pub const Writer = struct {
             const text = reason(status);
             @memcpy(out[n..][0..text.len], text);
             n += text.len;
-            const server = "\r\nServer: zig-http\r\nDate: ";
+            const server = "\r\nServer: bounded-http\r\nDate: ";
             @memcpy(out[n..][0..server.len], server);
             n += server.len;
             @memcpy(out[n..][0..29], &self.header_cache.date);
@@ -450,7 +450,7 @@ test "begin writes the head into the arena and flush keeps the snapshot" {
     var writer = Writer.init(&arena, &cache, 0);
     writer.open(0, true, false);
     try writer.begin(200, "text/plain", 7);
-    const head = "HTTP/1.1 200 OK\r\nServer: zig-http\r\nDate: Sat, 05 Sep 2026 12:34:56 GMT\r\nContent-Type: text/plain\r\nContent-Length: 7\r\n\r\n";
+    const head = "HTTP/1.1 200 OK\r\nServer: bounded-http\r\nDate: Sat, 05 Sep 2026 12:34:56 GMT\r\nContent-Type: text/plain\r\nContent-Length: 7\r\n\r\n";
     try std.testing.expectEqualStrings(head, arena[0..writer.body_start]);
     const reserved = try writer.reserve(8);
     @memcpy(reserved[0..3], "one");
@@ -470,7 +470,7 @@ test "non-200 heads, close and chunked size fields are laid out exactly" {
     var writer = Writer.init(&arena, &cache, 0);
     writer.open(100, false, false);
     try writer.begin(404, "text/html; charset=utf-8", null);
-    const head = "HTTP/1.1 404 Not Found\r\nServer: zig-http\r\nDate: Sat, 05 Sep 2026 12:34:56 GMT\r\n" ++
+    const head = "HTTP/1.1 404 Not Found\r\nServer: bounded-http\r\nDate: Sat, 05 Sep 2026 12:34:56 GMT\r\n" ++
         "Content-Type: text/html; charset=utf-8\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
     try std.testing.expectEqualStrings(head, arena[100 .. 100 + head.len]);
     try std.testing.expectEqual(@as(usize, 100 + head.len), writer.chunk_size_at.?);

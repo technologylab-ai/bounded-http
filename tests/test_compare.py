@@ -10,6 +10,34 @@ compare = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(compare)
 
 class WrkReceiptTests(unittest.TestCase):
+    def test_current_and_historical_framework_names_retain_validation(self):
+        ready = 'READY backend=io_uring optimize=ReleaseSafe\n'
+        stats = dict(execution='inline_event_loop', workers=0, worker_dispatches=0,
+                     allocation_calls_after_start=0, live_connections=0,
+                     live_operations=0, peak_connections=128)
+        log = ready + 'STATS ' + json.dumps(stats) + '\n'
+        for identity in ('bounded-http', 'zig-http'):
+            for configuration in ({'name': identity}, {'name': 'candidate', 'implementation': identity}):
+                with self.subTest(configuration=configuration):
+                    compare.validate_framework_ready(configuration, ready)
+                    self.assertEqual(compare.parse_framework_stats(configuration, 0, log), stats)
+                    for bad_ready in ('', 'READY optimize=Debug\n'):
+                        with self.assertRaises(RuntimeError):
+                            compare.validate_framework_ready(configuration, bad_ready)
+                    for exit_code, bad_log in ((1, log), (0, ready), (0, log + log)):
+                        with self.assertRaises(RuntimeError):
+                            compare.parse_framework_stats(configuration, exit_code, bad_log)
+                    for key, value in (('workers', 1), ('worker_dispatches', 1),
+                                       ('allocation_calls_after_start', 1), ('live_connections', 1),
+                                       ('live_operations', 1), ('peak_connections', 129)):
+                        bad_stats = dict(stats, **{key: value})
+                        with self.assertRaises(RuntimeError):
+                            compare.parse_framework_stats(configuration, 0, 'STATS ' + json.dumps(bad_stats))
+        for server in ({'name': 'libreactor'}, {'name': 'mrhttp'},
+                       {'name': 'bounded-http', 'implementation': 'libreactor'}):
+            compare.validate_framework_ready(server, '')
+            self.assertIsNone(compare.parse_framework_stats(server, 0, ''))
+
     def receipt(self, **changes):
         record = dict(requests=1600, duration_us=2000000, bytes=200000,
                       connect_errors=0, read_errors=0, write_errors=0,

@@ -9,10 +9,10 @@ printf 'checkout_commit=%s (streamed tree; require clean status for publication)
 COPYFILE_DISABLE=1 tar --no-xattrs --exclude=.git --exclude=.zig-cache \
     --exclude=zig-out --exclude=.claude/worktrees --exclude='__pycache__' -C "$repository_root" -czf - . |
     ssh -o BatchMode=yes -o ConnectTimeout=5 "$linux_host" 'set -eu
-        run_directory=$(mktemp -d /tmp/zig-http.XXXXXX)
+        run_directory=$(mktemp -d /tmp/bounded-http.XXXXXX)
         cleanup() {
             case "$run_directory" in
-                /tmp/zig-http.*) rm -rf -- "$run_directory" ;;
+                /tmp/bounded-http.*) rm -rf -- "$run_directory" ;;
                 *) printf "unsafe cleanup target: %s\n" "$run_directory" >&2 ;;
             esac
         }

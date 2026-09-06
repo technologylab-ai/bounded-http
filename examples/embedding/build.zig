@@ -3,7 +3,7 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
-    const dependency = b.dependency("zig_http", .{ .target = target, .optimize = optimize });
+    const dependency = b.dependency("bounded_http", .{ .target = target, .optimize = optimize });
     const module = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,

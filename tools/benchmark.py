@@ -22,7 +22,7 @@ from urllib.parse import urlsplit
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location("zig_http_wire_test", ROOT / "tests/integration.py")
+SPEC = importlib.util.spec_from_file_location("bounded_http_wire_test", ROOT / "tests/integration.py")
 WIRE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(WIRE)
 
@@ -114,7 +114,7 @@ def main():
     cpu_elapsed = time.process_time() - cpu_start
     latencies = [value for result in results for value in result["latencies"]]
     errors = [result["error"] for result in results if result["error"]]
-    receipt = dict(schema_version=1, tool="zig-http-python-smoke", ok=not errors and len(latencies) == args.requests,
+    receipt = dict(schema_version=1, tool="bounded-http-python-smoke", ok=not errors and len(latencies) == args.requests,
                    classification="Python/client-bound smoke; not TechEmpower ranking or server capacity",
                    latency_model="closed-loop; each pipelined response measured from its batch send",
                    url=args.url, platform=platform.platform(), machine=platform.machine(),

@@ -22,7 +22,7 @@ pub fn main(init: std.process.Init) !void {
     _ = args.next();
     while (args.next()) |flag| {
         if (std.mem.eql(u8, flag, "--help")) {
-            std.debug.print("zig-http: bounded experimental Linux io_uring / macOS kqueue HTTP/1.1\n" ++
+            std.debug.print("bounded-http: bounded experimental Linux io_uring / macOS kqueue HTTP/1.1\n" ++
                 "--port N --connections N --execution workers|inline --workers N --max-body N --max-header N\n" ++
                 "--timeout-ms N --duration-ms N --send-chunk N --gather-send 0|1 --stall-ms N\n" ++
                 "--response-batch-limit N --socket-send-buffer N --output-bytes N --max-response N --memory-budget N --index FILE\n" ++

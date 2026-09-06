@@ -45,15 +45,15 @@ def cpu_list(text):
 def validate(args):
     require(sys.platform == 'linux' and os.uname().machine == 'x86_64',
             'this recipe requires native Linux x86_64; its CPython wheels are architecture-specific')
-    require(re.fullmatch(r'/tmp/zig-http-compare\.[A-Za-z0-9]{6,}', str(args.directory)),
-            'directory must be /tmp/zig-http-compare.<at least six alphanumeric characters>')
+    require(re.fullmatch(r'/tmp/bounded-http-compare\.[A-Za-z0-9]{6,}', str(args.directory)),
+            'directory must be /tmp/bounded-http-compare.<at least six alphanumeric characters>')
     info = args.directory.lstat()
     require(stat.S_ISDIR(info.st_mode) and not args.directory.is_symlink()
             and args.directory.resolve() == args.directory and info.st_uid == os.getuid(),
             'temporary directory must be real, canonical, and owned by the caller')
-    require(re.fullmatch(r'[0-9a-f]{40}', args.commit), 'provide the full archived Zig HTTP commit')
-    archive = args.directory / 'zig-http'
-    require(archive.is_dir() and not archive.is_symlink(), 'place the clean Zig HTTP archive in directory/zig-http first')
+    require(re.fullmatch(r'[0-9a-f]{40}', args.commit), 'provide the full archived bounded-http commit')
+    archive = args.directory / 'bounded-http'
+    require(archive.is_dir() and not archive.is_symlink(), 'place the clean bounded-http archive in directory/bounded-http first')
     require((archive / '.zig-version').read_text().strip() == PINS['zig_version'], 'Zig version mismatch')
     require((archive / 'src/main.zig').is_file(), 'missing archived server sources')
     require((archive / 'tools/compare.py').is_file(), 'archive must contain the comparison harness')
@@ -233,9 +233,9 @@ cat /etc/os-release > /work/os-release.txt
         self.command(['docker', 'pull', '--platform', 'linux/amd64', PINS['python_image']], timeout=600)
         self.receipt['python_image_inspect'] = json.loads(self.command(['docker', 'image', 'inspect', PINS['python_image']], capture=True))
         user = str(os.getuid()) + ':' + str(os.getgid())
-        name = 'zig-http-tfb-mrhttp-' + self.root.name.split('.', 1)[1]
+        name = 'bounded-http-tfb-mrhttp-' + self.root.name.split('.', 1)[1]
         install_name = name + '-install'
-        ownership = 'ai.technologylab.zig-http-preparation=' + uuid.uuid4().hex
+        ownership = 'ai.technologylab.bounded-http-preparation=' + uuid.uuid4().hex
         self.receipt['install_container'] = dict(name=install_name, ownership_label=ownership)
         try:
             self.command(['docker', 'run', '--rm', '--name', install_name, '--label', ownership,
@@ -270,18 +270,18 @@ cat /etc/os-release > /work/os-release.txt
         return name
 
     def finish(self, container):
-        source = self.root / 'zig-http'
+        source = self.root / 'bounded-http'
         self.command([self.args.zig, 'build', '-Doptimize=ReleaseSafe', '-j2'], source)
-        binary = source / 'zig-out/bin/zig-http'
+        binary = source / 'zig-out/bin/bounded-http'
         self.receipt['hashes'][str(binary.relative_to(self.root))] = sha256(binary)
         for path in sorted(source.rglob('*')):
             relative = path.relative_to(source)
             if path.is_file() and not any(part in ('.git', '.zig-cache', 'zig-out', '__pycache__') for part in relative.parts):
-                self.receipt['hashes']['zig-http/' + str(relative)] = sha256(path)
+                self.receipt['hashes']['bounded-http/' + str(relative)] = sha256(path)
         config = dict(server_cpus=self.args.server_cpus, client_cpus=self.args.client_cpus,
                       wrk=str(self.root / 'bin/wrk'), implementation_commit=self.args.commit,
                       servers=[
-            dict(name='zig-http', cwd=str(source), command=[str(binary), '--port', '8080', '--connections', '128',
+            dict(name='bounded-http', cwd=str(source), command=[str(binary), '--port', '8080', '--connections', '128',
                  '--execution', 'inline', '--workers', '0', '--duration-ms', '120000'],
                  body='Hello, World!', expected_execution='inline_event_loop'),
             dict(name='libreactor', cwd=str(self.root), command=[str(self.root / 'bin/libreactor')], body='Hello, World!'),
@@ -313,7 +313,7 @@ cat /etc/os-release > /work/os-release.txt
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory', type=Path)
-    parser.add_argument('--commit', required=True, help='full commit used to create directory/zig-http with git archive')
+    parser.add_argument('--commit', required=True, help='full commit used to create directory/bounded-http with git archive')
     parser.add_argument('--server-cpus', type=cpu_list, default=[0, 1, 2])
     parser.add_argument('--client-cpus', type=cpu_list, default=[3, 4, 5, 6, 7])
     parser.add_argument('--zig', default='zig')

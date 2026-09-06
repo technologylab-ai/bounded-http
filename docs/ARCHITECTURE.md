@@ -1,4 +1,4 @@
-# Server architecture
+# bounded/http architecture
 
 The server provides bounded HTTP/1.1 processing with explicit ownership of memory and network operations.
 The current implementation targets exact Zig 0.16.0.
