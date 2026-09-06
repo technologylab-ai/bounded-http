@@ -16,7 +16,8 @@ See [using the server](USING.md) for embedding instructions.
 | Term | Meaning |
 | --- | --- |
 | Owner | A thread with exclusive authority to advance one server instance's network state. |
-| Shard | One server instance, with an owner, listener, transport adapter, and private connection storage. |
+| Shard | One server instance, with an owner, transport adapter, and private connection storage. |
+| Handoff | Transfer of exclusive socket ownership from the accepting shard to another shard. |
 | Cluster | The coordinator for one or more shards. |
 | Slot | A startup reservation containing one connection's input, output, parser state, and operation bookkeeping. |
 | Arena | One contiguous output buffer assigned to a slot. |
@@ -43,14 +44,49 @@ The framework creates no threads during request processing.
 
 A CPU denotes a logical processor here.
 Linux defaults to one shard per allowed CPU, with a maximum of 16.
-Explicit Linux configurations can select up to 64 shards.
-macOS and Windows currently require one shard.
+Explicit Linux and Windows configurations can select up to 64 shards.
+Windows defaults to one shard; select additional owners with `--shards N`.
+macOS currently requires one shard.
 These choices belong to this implementation, rather than the `std.Io` interface contract.
 
 Each Linux shard has a separate listener using `SO_REUSEPORT`.
 The kernel distributes accepted connections among those listeners.
 The cluster shares a connection admission counter across shards.
 Each shard reserves the full configured slot count because distribution can be uneven.
+
+### Windows socket handoff
+
+![Windows transfers accepted sockets through bounded queues to independent IOCP owners.](diagrams/windows-handoff.svg)
+
+Windows uses one exclusive listener, owned by shard zero.
+Shard zero also processes its own share of connections.
+Each secondary shard has its own IOCP, operation records, and connection storage.
+The cluster creates no additional acceptor thread.
+
+`AcceptEx` accepts without reading request bytes.
+Shard zero collects the terminal accept completion before transferring the socket.
+The accepting adapter updates the socket's listener context while the listener remains alive.
+The socket has no IOCP association at this point.
+
+Shard zero reserves one shared admission charge, then chooses destinations in round-robin order.
+A charge remains held during transfer, queue residence, and connection processing.
+Each secondary queue has one producer and one consumer.
+Queue publication transfers only the socket handle and acceptance timestamp.
+No request bytes move between shard buffers.
+
+The destination associates the socket with its own IOCP before receiving bytes.
+That association lasts until the socket closes.
+An established connection stays with its destination; the server does not migrate live requests.
+
+Each queue holds at most the configured connection count.
+The shared admission ceiling applies across all queues and adopted connections.
+Owners process at most that many queued entries per turn.
+Remaining entries force another nonblocking poll.
+Notifications wake owners; a ten-millisecond poll timeout provides a fallback.
+
+The destination checks the original acceptance deadline before adoption.
+Queue residence never resets that deadline.
+Import failures and expired entries close their sockets and release admission.
 
 ### Inline callbacks
 
@@ -221,7 +257,10 @@ Inline execution uses `response_batch_limit`.
 | Arena bytes per slot | `output_bytes` |
 | Response cells across the cluster | `S × C × B` |
 | Operation cells per shard | `4 × C + 2` |
-| Windows socket-table entries | `C + 1`, plus one separate listener handle |
+| Windows socket-table entries | `S × (C + 1)`, plus one separate listener handle |
+| Windows handoff queue capacity | `C` entries per secondary owner |
+| Windows handoff storage | `(S − 1) × (C + 1)` optional entries, including queue sentinels |
+| Windows application-owned socket handles | At most `C + 1` nonlistener sockets, plus one listener |
 | Vector capacity for one batch | `2 × B + 1` |
 | Requested startup stack bytes | `worker_stack_bytes × (workers + S − 1)` |
 | Exact requested framework heap bytes | `Cluster.heapBytes(config)` |
@@ -230,7 +269,8 @@ Each slot has receive and send operation cells, plus their separate cancellation
 Each listener adds accept and cancellation cells.
 The cluster also allocates coordinator, shard pointer, thread, and failure arrays.
 `Cluster.heapBytes()` includes these framework allocations.
-Windows accounting also includes its socket table and fixed completion queue.
+Windows accounting also includes each socket table, fixed completion queue, and handoff queue.
+The queue sentinel distinguishes full and empty states without reducing the declared capacity.
 
 `Cluster.validate()` rejects configurations whose requested framework heap and startup stacks exceed `memory_budget_bytes`.
 `Budget` separately enforces the requested live framework heap limit during allocation.
@@ -242,10 +282,13 @@ It also excludes actual stack mappings, operating-system thread metadata, kernel
 The configured budget therefore does not bound resident process memory.
 The application must account for those additional resources separately.
 
-Admission limits active connection slots rather than the kernel's connection backlog.
+Admission limits owned connections rather than the kernel's connection backlog.
+On Windows, owned connections include queued sockets and sockets moving between owners.
 A shard can transiently accept an extra socket before rejecting admission.
 The owner then closes that socket without allocating another slot.
-Windows prepares a socket for each pending accept within its fixed table capacity.
+Windows maintains one pending accept and one extra staging socket across the cluster.
+The staging socket can exceed the admission count before immediate refusal.
+The listener adds one further application-owned socket handle.
 Winsock creates that kernel resource during admission; framework heap sealing does not intercept provider or kernel allocations.
 Closing a socket releases the framework's handle ownership before Windows necessarily finishes background TCP cleanup.
 The socket-table limit therefore does not bound all provider resources retained over time.
@@ -264,7 +307,7 @@ An operation that cannot progress registers for `kqueue` readiness.
 Readiness permits another attempt; it does not release the operation's buffers.
 The adapter reports completion after the socket operation terminates.
 
-The [Windows adapter](../src/transport_windows.zig) uses one completion port and stable, preallocated operation records.
+The [Windows adapter](../src/transport_windows.zig) uses one completion port per shard and stable, preallocated operation records.
 Each record contains `OVERLAPPED`, the Windows structure that identifies an asynchronous operation.
 `AcceptEx` accepts without waiting for initial request bytes.
 `WSARecv` receives into slot storage; `WSASend` transmits retained response spans.
@@ -274,7 +317,7 @@ Each dequeue retrieves at most 256 entries.
 The adapter checks each operation's result separately because one successful dequeue can contain failed operations.
 The adapter converts caller vectors into a fixed `WSABUF` array during submission.
 Winsock captures those descriptors; response payloads remain borrowed until completion.
-Windows uses exclusive listener binding and rejects multiple shards.
+Windows uses exclusive listener binding and distributes sockets through the bounded handoff described above.
 
 A cancellation acknowledgement and the cancelled operation's completion are separate events.
 The server retains storage until both relevant events settle.
@@ -303,6 +346,16 @@ Closing can also discard finished responses that remain unsent in a batch.
 
 Any shard's exit requests shutdown across the cluster.
 The owners stop admission, request cancellation, and drain outstanding operations.
+On Windows, a stopping receiver requests cluster-wide stop before waiting for the accepting owner.
+The accepting owner publishes `producer_done` when no further queue publication can occur.
+Receivers acquire that flag before their final queue-empty check.
+Receivers close queued sockets and reconcile local operations before exiting.
+The cluster retains every adapter and the listener until all owners have exited.
+Only then can final Winsock cleanup occur.
+
+`producer_done` does not establish that a failed acceptor reconciled its kernel operations.
+A failed owner retains its storage under the existing process-termination boundary.
+
 Worker cancellation remains cooperative.
 The cluster waits for secondary exit acknowledgements before joining threads.
 
@@ -323,6 +376,7 @@ The framework cannot safely kill one arbitrary callback and reuse its borrowed m
 | [server.zig](../src/server.zig) | Configuration, cluster coordination, admission, scheduling, batching, deadlines, and shutdown. |
 | [api.zig](../src/api.zig) | Callback context, continuation events, and response writer. |
 | [http.zig](../src/http.zig) | Incremental framing validation and borrowed request access. |
+| [handoff.zig](../src/handoff.zig) | Fixed queues with exclusive socket ownership and acquire/release publication. |
 | [budget.zig](../src/budget.zig) | Framework allocator accounting and sealing. |
 | [transport.zig](../src/transport.zig) | Platform selection, common operation types, and listener setup. |
 | [transport_linux.zig](../src/transport_linux.zig) | Linux completion adapter. |

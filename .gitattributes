@@ -1,3 +1,4 @@
 * text=auto eol=lf
 # Preserve exact native evidence bytes across checkout platforms.
 reports/2026-09-06-windows-iocp/** -text -whitespace
+reports/2026-09-06-windows-shards/** -text -whitespace

@@ -271,7 +271,7 @@ alone can drain its prefix first and is insufficient evidence for that case.
 ## Shards: several I/O owners
 
 `Config.shards` runs that many complete, independent servers on one port, each
-with its own listener (`SO_REUSEPORT`), transport, slots, arenas, operation
+with its own transport, slots, arenas, operation
 cells, clock and counters. They share admission, stop/start coordination, the startup allocator and the
 application pointer; shard 0 runs on the
 calling thread and the others on threads created at start with fixed stacks.
@@ -285,7 +285,38 @@ Only inline execution supports several shards. Linux reuse-port distributes conn
 configuration. The preliminary M3 Max fixture observed all connections at the
 last-bound listener; macOS currently rejects more than one shard. This fixture
 is not a universal claim about every XNU version or socket configuration.
-Windows also requires one shard and uses exclusive listener binding.
+Windows supports multiple inline shards through one exclusive listener on shard zero.
+The accepting owner also handles its own round-robin share.
+Each destination receives an unassociated socket through a fixed single-producer, single-consumer queue.
+The destination associates that socket with its own IOCP before initiating any receive.
+The transfer carries metadata only; request payloads never cross owner buffers.
+
+Admission covers producer transit, queue residence, consumer transit, and adopted slots without releasing the charge between stages.
+Each secondary queue has usable capacity `C`, backed by `C + 1` optional entries.
+The extra entry distinguishes a full queue from an empty queue.
+Successful queue publication invalidates the producer's optional value.
+The consumer alone imports or closes the transferred socket.
+The cluster reserves queue storage and metadata within `Cluster.heapBytes()`.
+
+The Windows admission counter never exceeds `C`, including rejected reservation attempts.
+One pending `AcceptEx` can retain one additional staging socket.
+The cluster therefore owns at most `C + 1` nonlistener socket handles, plus its single listener.
+Provider allocations, the kernel backlog, and background TCP cleanup remain outside that handle bound.
+
+Queue residence retains the original acceptance deadline.
+The destination refreshes its clock before each adoption and closes expired entries.
+Each turn drains at most `C` entries; remaining entries keep polling nonblocking.
+Shutdown from any owner stops the distributor before receivers wait for publication completion.
+Receivers acquire `producer_done` before checking queue emptiness again.
+The flag means no further publication, including when the producer returns an error.
+The flag never authorizes freeing a failed producer's outstanding operation records.
+All queues and owners drain before adapter destruction and final process-wide Winsock cleanup.
+
+`handoffs_sent` counts queue publications; `handoffs_received` counts queue removals.
+Successful shutdown requires both totals to match.
+`handoffs_closed` counts received entries closed before adoption succeeds.
+`max_handoff_delay_ns` measures elapsed time from the sampled acceptance timestamp to adoption checking.
+That counter is an observation, not a scheduler latency guarantee.
 Merged STATS sum counters
 and take maxima; per-shard admission is printed separately. A shard that cannot
 reconcile ownership by the shutdown deadline still ends the whole process.

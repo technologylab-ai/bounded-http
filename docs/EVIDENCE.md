@@ -15,6 +15,10 @@ OS and design inputs already pinned in the wiki before implementation:
   for readiness, one-shot registrations and filters.
 - [Microsoft AcceptEx contract](https://github.com/MicrosoftDocs/sdk-api/blob/5f2625b6782d3e9c0df08756583c527a0a2872ca/sdk-api-src/content/mswsock/nf-mswsock-acceptex.md)
   for zero-data asynchronous accept and accepted-socket context updates.
+- [Microsoft completion-port association contract](https://github.com/MicrosoftDocs/sdk-api/blob/5f2625b6782d3e9c0df08756583c527a0a2872ca/sdk-api-src/content/ioapiset/nf-ioapiset-createiocompletionport.md)
+  for first association, handle lifetime, and listenerless completion ports.
+- [Microsoft Winsock cleanup contract](https://github.com/MicrosoftDocs/sdk-api/blob/5f2625b6782d3e9c0df08756583c527a0a2872ca/sdk-api-src/content/winsock/nf-winsock-wsacleanup.md)
+  for balanced startup references and final process-wide cleanup after all owners drain.
 - [Microsoft overlapped socket contract](https://github.com/MicrosoftDocs/sdk-api/blob/5f2625b6782d3e9c0df08756583c527a0a2872ca/sdk-api-src/content/winsock2/nf-winsock2-wsasend.md)
   for descriptor capture and payload lifetime.
 - [Microsoft batched completion contract](https://github.com/MicrosoftDocs/sdk-api/blob/5f2625b6782d3e9c0df08756583c527a0a2872ca/sdk-api-src/content/ioapiset/nf-ioapiset-getqueuedcompletionstatusex.md)
