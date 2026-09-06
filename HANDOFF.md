@@ -1,3 +1,17 @@
+# Native networking highlighted — 2026-09-06
+
+The website introduction and README now name Linux `io_uring`, macOS `kqueue`, and Windows IOCP prominently.
+The website adds linked platform cards and a backend line in its navigation footer.
+The README opens with a native backend table before project and integration details.
+The architecture text distinguishes asynchronous completion from readiness-driven nonblocking socket operations.
+The existing headline, byline, performance figures, and runtime implementation remain unchanged.
+
+Documentation links, seven accessible SVGs, offline generation, and the 24-file Pages artifact passed their checks.
+Five browser checks passed: desktop, keyboard links, mobile at 320/390 pixels, offline without JavaScript, and print.
+The preview receipt and screenshots remain in `.zig-cache/native-backends-site/local/` in the canonical HTTP checkout.
+The isolated browser and preview server stopped; the Mac reservation was released.
+This documentation change adds no new runtime or comparative-performance evidence.
+
 # Worker streaming merged — 2026-09-06
 
 [PR #3](https://github.com/technologylab-ai/bounded-http/pull/3) merged at `86e8ec2cc5fbe9f5d08ed01c496d61ae519cf261`.

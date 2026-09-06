@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="bounded/http: resource limits, ownership, evented I/O, output arenas, and measured performance.">
+<meta name="description" content="bounded/http: a bounded Zig HTTP/1.1 framework with native io_uring on Linux, kqueue on macOS, and IOCP on Windows.">
 <meta name="color-scheme" content="light">
 <title>bounded/http — Architecture and performance</title>
 <style>
@@ -15,6 +15,19 @@
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 @page{size:A4;margin:16mm 14mm}
 @media print{body{background:white;color:#172f40;font-size:10pt;line-height:1.5}.rail,.skip,.no-print,.cpu-controls{display:none!important}.document{max-width:none;margin:0;padding:0}.topline{padding-top:0}.hero{padding:28px 0}.hero h1{font-size:49pt}.lead{font-size:14pt}.section{padding:25px 0;break-before:auto}.section h2{font-size:26pt;break-after:avoid}.section h3{break-after:avoid}.figure{break-inside:avoid;padding:8px;margin:20px 0}.figure-scroll{overflow:visible}.figure svg{min-width:0!important}.two{gap:20px}.terms{grid-template-columns:1fr 1fr}.table-wrap{overflow:visible}.numbers{min-width:0}table{font-size:9pt}tr{break-inside:avoid}.callout{background:#edf0eb;color:#172f40;break-inside:avoid}.callout p{color:#172f40}.cpu-panel[hidden]{display:block!important}.end{padding:20px 0}a{text-decoration:none}.note{font-size:9pt}.hero-art strong{font-size:29pt}.optimization{break-inside:avoid}pre{white-space:pre-wrap;overflow-wrap:anywhere;break-inside:avoid}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+.rail-backends{display:block;margin:5px 0;font:10px/1.8 var(--mono);color:var(--orange)}
+.backend-label{margin:27px 0 10px;font:10px/1.5 var(--mono);letter-spacing:1.4px;text-transform:uppercase;color:var(--muted)}
+.backend-specs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));list-style:none;margin:0;padding:0;border:1px solid var(--line);background:var(--white)}
+.backend-specs li+li{border-left:1px solid var(--line)}
+.backend-specs a{display:block;height:100%;padding:16px 20px;text-decoration:none;border-top:2px solid var(--orange)}
+.backend-specs a:hover{background:var(--soft);color:var(--ink)}
+.backend-platform{display:block;font:11px/1.5 var(--mono);color:var(--muted)}
+.backend-specs strong{display:block;margin:5px 0;font:600 23px/1.4 var(--mono);letter-spacing:-.8px;color:var(--ink)}
+.backend-mode{display:block;font-size:12px;line-height:1.5;color:var(--muted)}
+@media(max-width:760px){.backend-specs a{padding:12px 10px}.backend-specs strong{font-size:18px}.backend-mode{font-size:11px}.backend-platform{font-size:10px}}
+@media(max-width:400px){.backend-specs a{padding:11px 8px}.backend-specs strong{font-size:16px;letter-spacing:-.5px}}
+@media print{.backend-specs{break-inside:avoid}.backend-specs a{padding:10px 15px}.backend-specs strong{font-size:17pt}}
 </style>
 </head>
 <body>
@@ -22,7 +35,7 @@
 <aside class="rail" aria-label="Document navigation">
 <div class="brand">bounded/http<small>ENGINEERING PAPER 01</small></div>
 <nav><a href="#principles"><span>01</span> Design principles</a><a href="#startup"><span>02</span> Inside main.zig</a><a href="#cluster"><span>03</span> Cluster and ownership</a><a href="#request"><span>04</span> Request and response</a><a href="#performance"><span>05</span> Less work per response</a><a href="#evidence"><span>06</span> Measured results</a><a href="#embedding"><span>07</span> Use the framework</a><a href="#limits"><span>08</span> Failure and scope</a><a href="#references"><span>09</span> Sources</a></nav>
-<div class="rail-footer">ZIG 0.16.0<br>LINUX + MACOS + WINDOWS<br>EXPERIMENTAL FRAMEWORK<a href="read.html?file=docs/ARCHITECTURE.md">Architecture guide ↗</a><a href="read.html?file=docs/USING.md">Integration guide ↗</a></div>
+<div class="rail-footer">ZIG 0.16.0<br>LINUX + MACOS + WINDOWS<span class="rail-backends">io_uring · kqueue · IOCP</span>EXPERIMENTAL FRAMEWORK<a href="read.html?file=docs/ARCHITECTURE.md">Architecture guide ↗</a><a href="read.html?file=docs/USING.md">Integration guide ↗</a></div>
 </aside>
 <main class="document" id="content">
 <div class="topline"><span class="edition">Technology Lab · Systems engineering</span><span>06 September 2026 <button class="print-button no-print" id="print" type="button"> / Print</button></span></div>
@@ -30,7 +43,13 @@
 <p class="eyebrow">A bounded HTTP/1.1 framework</p>
 <p class="byline">for servers that stay within their bounds</p>
 <h1>Fast by design.<br><em>Explicit about limits.</em></h1>
-<p class="lead">The framework reserves its resources before serving requests. Each connection has reserved storage. Small responses share one output buffer.</p>
+<p class="lead">The server uses native event-driven networking on Linux, macOS, and Windows. The framework reserves memory and threads before the first request. Small responses share one output buffer.</p>
+<p class="backend-label" id="backend-label">Native event-driven networking</p>
+<ul class="backend-specs" aria-labelledby="backend-label">
+<li><a href="#linux-io"><span class="backend-platform">Linux</span><strong>io_uring</strong><span class="backend-mode">Asynchronous operations</span></a></li>
+<li><a href="#macos-io"><span class="backend-platform">macOS</span><strong>kqueue</strong><span class="backend-mode">Nonblocking sockets</span></a></li>
+<li><a href="#windows-io"><span class="backend-platform">Windows</span><strong>IOCP</strong><span class="backend-mode">Overlapped operations</span></a></li>
+</ul>
 <p class="scope"><span class="pill">EXACT ZIG 0.16.0</span><span class="pill">ASSERTIONS ENABLED</span><span class="pill">LOOPBACK EXPERIMENT</span></p>
 <div class="hero-art" aria-label="Default configuration and measured result">
 <div><strong>0</strong><span>Extra application threads<br>Default configuration</span></div>
@@ -86,10 +105,14 @@
 <p>Linux selects one inline shard per allowed CPU, with an automatic maximum of sixteen.</p>
 <p>Explicit Linux and Windows configurations support up to sixty-four shards within the resource budget. macOS supports one shard.</p>
 <p>The macOS decision follows the recorded listener-distribution experiment. That observation does not establish universal behavior across macOS releases.</p>
-<p>Linux uses a custom <code>io_uring</code> backend. The Linux interface provides submission and completion queues for asynchronous operations.</p>
-<p>macOS uses nonblocking sockets and <code>kqueue</code>. The macOS interface reports readiness. The adapter translates readiness into operation results.</p>
+<h3 id="native-io">Native event-driven networking.</h3>
+<p>An event-driven backend advances connections when the operating system reports readiness or completion.</p>
+<p>While one connection waits for network progress, its owner can service other ready connections.</p>
+<p>The build target selects the native backend automatically.</p>
+<p id="linux-io">Linux uses a custom <code>io_uring</code> backend. The Linux interface provides submission and completion queues for asynchronous operations.</p>
+<p id="macos-io">macOS uses nonblocking sockets and <code>kqueue</code>. The macOS interface reports readiness. The adapter translates readiness into operation results.</p>
 <p>Windows defaults to one shard. Select additional inline owners with <code>--shards N</code>.</p>
-<p>Windows uses overlapped sockets and one I/O completion port (IOCP) per shard. Each port delivers operation results to its owner.</p>
+<p id="windows-io">Windows uses overlapped sockets and one I/O completion port (IOCP) per shard. Each port delivers operation results to its owner.</p>
 <p>Fixed operation records retain buffers through completion and cancellation. Windows uses the same callback, writer, batching, and admission contracts.</p>
 <h3>Windows: one listener, independent owners.</h3>
 <p>Shard zero accepts connections and handles its own round-robin share. Fixed queues transfer other sockets to their destination owners.</p>

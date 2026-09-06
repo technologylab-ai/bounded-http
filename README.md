@@ -4,6 +4,19 @@
 
 **Fast by design. Explicit about limits.**
 
+An experimental HTTP/1.1 framework and reference server for **Zig 0.16.0**, built on **native event-driven networking**.
+
+| Platform | Native backend | Network progress |
+| --- | --- | --- |
+| **Linux** | **`io_uring`** | The kernel receives asynchronous operations through submission queues and reports their completion. |
+| **macOS** | **`kqueue`** | Readiness events drive nonblocking socket operations. |
+| **Windows** | **IOCP** — I/O completion ports | Overlapped socket operations report completion to their owning thread. |
+
+Each network owner is a thread that manages many connections through readiness or completion events.
+While one connection waits for network progress, its owner can service other ready connections.
+The framework reserves memory and threads before serving requests, with explicit connection, request, and response limits.
+The build target selects the native backend automatically.
+
 The repository and executable use `bounded-http`.
 The Zig package and module use `bounded_http`.
 The project was previously named `zig-http`.
@@ -17,11 +30,7 @@ The [illustrated whitepaper](docs/whitepaper.html) presents the design and quali
 Open the HTML file in a browser; the document includes every SVG and works offline.
 The [independent embedding example](examples/embedding/src/main.zig) demonstrates the complete application lifecycle.
 
-An experimental HTTP/1.1 framework and reference server for **Zig 0.16.0**.
-Linux uses a custom single-shot `io_uring` adapter.
-macOS uses nonblocking sockets with `kqueue`.
-Windows uses overlapped sockets and an I/O completion port (IOCP).
-Application callbacks can run on the I/O owner or on fixed startup workers.
+Application callbacks can run on the network owner or on fixed startup workers.
 Inline execution is the default for trusted bounded, nonblocking handlers;
 blocking callbacks must explicitly select fixed startup workers.
 Worker callbacks can [flush output without returning](docs/USING.md#flush-within-a-worker-callback).
