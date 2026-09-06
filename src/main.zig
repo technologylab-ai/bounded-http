@@ -1,13 +1,35 @@
 const std = @import("std");
 const framework = @import("bounded_http");
 const api = framework.api;
+const builtin = @import("builtin");
+const win32 = struct {
+    extern "kernel32" fn SetConsoleCtrlHandler(?*const fn (u32) callconv(.winapi) i32, i32) callconv(.winapi) i32;
+    extern "kernel32" fn Sleep(u32) callconv(.winapi) void;
+};
 
-var active_cluster: ?*framework.Cluster = null;
+var active_cluster: std.atomic.Value(?*framework.Cluster) = .init(null);
+var active_controls: std.atomic.Value(u32) = .init(0);
 
 fn signalStop(_: std.posix.SIG) callconv(.c) void {
     // Every shard's event loop checks its lock-free flag at least once per
     // poll timeout. No allocation, logging, or framework callback here.
-    if (active_cluster) |cluster| for (cluster.shards) |server| server.stop_requested.store(true, .release);
+    requestControlStop();
+}
+
+fn consoleStop(kind: u32) callconv(.winapi) i32 {
+    if (kind != 0 and kind != 1) return 0; // CTRL_C_EVENT and CTRL_BREAK_EVENT
+    requestControlStop();
+    return 1;
+}
+
+fn requestControlStop() void {
+    // One total order prevents teardown and a new handler missing each other's
+    // publication. A late handler sees null; an earlier borrow must drain.
+    _ = active_controls.fetchAdd(1, .seq_cst);
+    defer _ = active_controls.fetchSub(1, .seq_cst);
+    if (active_cluster.load(.seq_cst)) |cluster| {
+        for (cluster.shards) |server| server.stop_requested.store(true, .release);
+    }
 }
 
 const Demo = struct { html: []const u8, stall_ms: u32, execution: framework.Execution };
@@ -22,7 +44,7 @@ pub fn main(init: std.process.Init) !void {
     _ = args.next();
     while (args.next()) |flag| {
         if (std.mem.eql(u8, flag, "--help")) {
-            std.debug.print("zig-http: bounded experimental Linux io_uring / macOS kqueue HTTP/1.1\n" ++
+            std.debug.print("zig-http: bounded experimental Linux io_uring / macOS kqueue / Windows IOCP HTTP/1.1\n" ++
                 "--port N --connections N --execution workers|inline --workers N --max-body N --max-header N\n" ++
                 "--timeout-ms N --duration-ms N --send-chunk N --gather-send 0|1 --stall-ms N\n" ++
                 "--response-batch-limit N --socket-send-buffer N --output-bytes N --max-response N --memory-budget N --index FILE\n" ++
@@ -93,15 +115,31 @@ pub fn main(init: std.process.Init) !void {
     defer std.debug.assert(budget.live_bytes == 0);
     const cluster = try framework.Cluster.init(budget.allocator(), config, handler, &demo);
     defer cluster.deinit();
-    const action: std.posix.Sigaction = .{
-        .handler = .{ .handler = signalStop },
-        .mask = std.posix.sigemptyset(),
-        .flags = 0,
+    active_cluster.store(cluster, .seq_cst);
+    defer {
+        // Clear publication before freeing shards. Windows invokes controls on
+        // separate OS threads; reconcile handlers that already borrowed them.
+        active_cluster.store(null, .seq_cst);
+        const deadline = framework.nowNs() + @as(u64, config.shutdown_ms) * 1_000_000;
+        while (active_controls.load(.seq_cst) != 0) {
+            if (framework.nowNs() >= deadline) framework.failFast(70);
+            std.Thread.yield() catch {};
+        }
+    }
+    if (builtin.os.tag == .windows) {
+        if (win32.SetConsoleCtrlHandler(consoleStop, 1) == 0) return error.ConsoleHandlerFailed;
+    } else {
+        const action: std.posix.Sigaction = .{
+            .handler = .{ .handler = signalStop },
+            .mask = std.posix.sigemptyset(),
+            .flags = 0,
+        };
+        std.posix.sigaction(.INT, &action, null);
+        std.posix.sigaction(.TERM, &action, null);
+    }
+    defer if (builtin.os.tag == .windows) {
+        std.debug.assert(win32.SetConsoleCtrlHandler(consoleStop, 0) != 0);
     };
-    active_cluster = cluster;
-    defer active_cluster = null;
-    std.posix.sigaction(.INT, &action, null);
-    std.posix.sigaction(.TERM, &action, null);
     try cluster.start();
     budget.sealed.store(true, .release);
     std.debug.print("READY port={d} backend={s} connections={d} workers={d} execution={s} gather_send={d} response_batch_limit={d} shards={d} callbacks_per_turn={d} optimize={s}\n", .{
@@ -113,7 +151,7 @@ pub fn main(init: std.process.Init) !void {
         // The counters name the retained owners for the shutdown diagnosis.
         const partial = cluster.stats();
         std.debug.print("FATAL {s}; retained loans require process termination; live_connections={d} live_operations={d}\n", .{ @errorName(err), partial.live_connections, partial.live_operations });
-        std.c._exit(70);
+        framework.failFast(70);
     };
     if (cluster.shards.len > 1) {
         // Per-shard admission shows how the kernel distributed connections.
@@ -199,9 +237,13 @@ fn handle(context: *api.Context) !api.Action {
             try writer.begin(501, "text/plain", 0);
             return writer.finish();
         }
-        var remaining: std.c.timespec = .{ .sec = demo.stall_ms / 1000, .nsec = @as(isize, demo.stall_ms % 1000) * 1_000_000 };
-        while (std.c.nanosleep(&remaining, &remaining) != 0) {
-            if (context.cancelled.load(.acquire)) return .close;
+        if (builtin.os.tag == .windows) {
+            win32.Sleep(demo.stall_ms);
+        } else {
+            var remaining: std.c.timespec = .{ .sec = demo.stall_ms / 1000, .nsec = @as(isize, demo.stall_ms % 1000) * 1_000_000 };
+            while (std.c.nanosleep(&remaining, &remaining) != 0) {
+                if (context.cancelled.load(.acquire)) return .close;
+            }
         }
         if (context.cancelled.load(.acquire)) return .close;
         try writer.begin(200, "text/plain", 4);

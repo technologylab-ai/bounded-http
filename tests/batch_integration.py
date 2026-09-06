@@ -307,7 +307,14 @@ def run(binary, emit, sessions):
     sessions.append(dict(phase="output_boundary", stats=server.stats))
     emit("buffered_demo_output_limit_returns_ordered_413")
 
-    maximum_cells(binary, emit, sessions)
+    if os.name == "posix":
+        maximum_cells(binary, emit, sessions)
+    else:
+        # These four fixtures require acknowledged SIGSTOP before admission.
+        # Other wire suites still exercise Windows partial sends and cancellation.
+        sessions.append(dict(phase="maximum_cells", skipped=4,
+                             reason="requires POSIX SIGSTOP/SIGCONT; no Windows runtime claim"))
+        print("SKIP four maximum-cell fixtures: POSIX process suspension required", file=sys.stderr)
 
     with BatchServer(binary, connections=8) as server:
         with contextlib.ExitStack() as stack:
@@ -389,7 +396,7 @@ def run(binary, emit, sessions):
                 wire.plaintext(server)
                 incomplete = stack.enter_context(server.connect())
                 incomplete.sendall(wire.REQUEST * 3 + b"GET /plaintext HTTP/1.1\r\nHost:")
-                server.process.send_signal(signal.SIGINT)
+                server.request_stop()
                 server.process.wait(timeout=5)
         wire.require(server.stats["gather_cancel_requests"] >= 1, "slow reader did not retain a cancellable gather")
         wire.require(server.stats["bytes_received"] >= len(payload) and server.stats["timeouts"] >= 1, "borrowed payload deadline was not reached")
@@ -400,7 +407,7 @@ def run(binary, emit, sessions):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--server", type=Path, default=wire.ROOT / "zig-out/bin/zig-http")
+    parser.add_argument("--server", type=Path, default=wire.SERVER_BINARY)
     parser.add_argument("--timeout", type=int, default=120)
     parser.add_argument("--json", type=Path)
     args = parser.parse_args()
@@ -413,8 +420,10 @@ def main():
     def emit(name):
         receipt["tests"].append(dict(name=name, ok=True))
         print("PASS " + name, file=sys.stderr, flush=True)
-    previous = signal.signal(signal.SIGALRM, watchdog)
-    signal.alarm(args.timeout)
+    previous = None
+    if hasattr(signal, "SIGALRM"):
+        previous = signal.signal(signal.SIGALRM, watchdog)
+        signal.alarm(args.timeout)
     try:
         wire.require(args.server.is_file(), "build the selected Debug/ReleaseSafe server first")
         run(args.server.resolve(), emit, receipt["sessions"])
@@ -423,8 +432,9 @@ def main():
         receipt["error"] = "%s: %s" % (type(error).__name__, error)
         traceback.print_exc(file=sys.stderr)
     finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, previous)
+        if previous is not None:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, previous)
     receipt["seconds"] = round(time.monotonic() - started, 6)
     receipt["passed"] = len(receipt["tests"])
     encoded = json.dumps(receipt, sort_keys=True)

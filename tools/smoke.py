@@ -16,7 +16,10 @@ import os
 from pathlib import Path
 import platform
 import re
-import resource
+try:
+    import resource
+except ImportError:
+    resource = None
 import signal
 import subprocess
 import sys
@@ -80,7 +83,7 @@ def environment():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--server", type=Path, default=ROOT / "zig-out/bin/zig-http")
+    parser.add_argument("--server", type=Path, default=WIRE.SERVER_BINARY)
     parser.add_argument("--requests", type=int, default=10000,
                         help="per workload, default 10000; three workloads with eight clients each")
     parser.add_argument("--timeout", type=int, default=150,
@@ -106,7 +109,7 @@ def main():
     deadline = started + args.timeout
     previous_handlers = {}
     server = None
-    child_usage_start = resource.getrusage(resource.RUSAGE_CHILDREN)
+    child_usage_start = resource.getrusage(resource.RUSAGE_CHILDREN) if resource else None
 
     def watchdog(signum, frame):
         raise TimeoutError("smoke orchestration interrupted or whole-run watchdog expired")
@@ -178,11 +181,12 @@ def main():
             signal.alarm(0)
         for number, handler in previous_handlers.items():
             signal.signal(number, handler)
-    child_usage_end = resource.getrusage(resource.RUSAGE_CHILDREN)
+    child_usage_end = resource.getrusage(resource.RUSAGE_CHILDREN) if resource else None
     receipt["child_cpu"] = dict(
-        user_seconds=round(child_usage_end.ru_utime - child_usage_start.ru_utime, 6),
-        system_seconds=round(child_usage_end.ru_stime - child_usage_start.ru_stime, 6),
-        scope="All reaped children, including server, clients and metadata commands; not isolated server CPU")
+        user_seconds=round(child_usage_end.ru_utime - child_usage_start.ru_utime, 6) if resource else None,
+        system_seconds=round(child_usage_end.ru_stime - child_usage_start.ru_stime, 6) if resource else None,
+        scope="All reaped children, including server, clients and metadata commands; not isolated server CPU" if resource else
+              "Unavailable: Python resource.getrusage is absent on Windows; no child CPU claim")
     receipt["seconds"] = round(time.monotonic() - started, 6)
     encoded = json.dumps(receipt, sort_keys=True)
     print(encoded)

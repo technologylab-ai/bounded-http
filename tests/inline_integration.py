@@ -16,7 +16,7 @@ import sys
 import time
 import traceback
 
-from integration import (PLAINTEXT, REQUEST, ROOT, ResponseReader, Server,
+from integration import (PLAINTEXT, REQUEST, ROOT, SERVER_BINARY, ResponseReader, Server,
                          expect_closed, plaintext, request, require)
 
 
@@ -143,7 +143,7 @@ def run_suite(binary, emit, sessions):
             incomplete.sendall(b"GET /plaintext HTTP/1.1\r\nHost:")
             plaintext(server)
             time.sleep(0.1)
-            server.process.send_signal(signal.SIGINT)
+            server.request_stop()
             server.process.wait(timeout=5)
     require(server.stats["bytes_received"] >= len(body) and server.stats["flushes"] >= 1,
             "shutdown fixture never published the borrowed response")
@@ -155,7 +155,7 @@ def run_suite(binary, emit, sessions):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--server", type=Path, default=ROOT / "zig-out/bin/zig-http")
+    parser.add_argument("--server", type=Path, default=SERVER_BINARY)
     parser.add_argument("--timeout", type=int, default=45)
     parser.add_argument("--json", type=Path)
     args = parser.parse_args()
@@ -172,8 +172,10 @@ def main():
     def watchdog(signum, frame):
         raise TimeoutError("whole-suite watchdog expired")
 
-    previous = signal.signal(signal.SIGALRM, watchdog)
-    signal.alarm(args.timeout)
+    previous = None
+    if hasattr(signal, "SIGALRM"):
+        previous = signal.signal(signal.SIGALRM, watchdog)
+        signal.alarm(args.timeout)
     start = time.monotonic()
     try:
         require(args.server.is_file(), "build server first")
@@ -183,8 +185,9 @@ def main():
         receipt["error"] = "%s: %s" % (type(error).__name__, error)
         traceback.print_exc(file=sys.stderr)
     finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, previous)
+        if previous is not None:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, previous)
     receipt["seconds"] = round(time.monotonic() - start, 6)
     receipt["passed"] = len(results)
     encoded = json.dumps(receipt, sort_keys=True)

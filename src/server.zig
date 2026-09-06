@@ -1,5 +1,15 @@
 const std = @import("std");
 const c = std.c;
+const builtin = @import("builtin");
+const windows = std.os.windows;
+const win32 = struct {
+    extern "kernel32" fn CreateEventW(?*anyopaque, i32, i32, ?[*:0]const u16) callconv(.winapi) ?windows.HANDLE;
+    extern "kernel32" fn SetEvent(windows.HANDLE) callconv(.winapi) i32;
+    extern "kernel32" fn WaitForSingleObject(windows.HANDLE, u32) callconv(.winapi) u32;
+    extern "kernel32" fn Sleep(u32) callconv(.winapi) void;
+    extern "kernel32" fn GetCurrentProcess() callconv(.winapi) windows.HANDLE;
+    extern "kernel32" fn TerminateProcess(windows.HANDLE, u32) callconv(.winapi) i32;
+};
 const assert = std.debug.assert;
 const transport = @import("transport.zig");
 const http = @import("http.zig");
@@ -94,7 +104,7 @@ pub const Config = struct {
             vectors,
             try std.math.mul(usize, count, 2 * @sizeOf(u32)),
             try std.math.mul(usize, self.workers, @sizeOf(Worker)),
-            try std.math.mul(usize, transport.cellCount(self.connections), transport.Backend.operation_bytes),
+            try transport.backendHeapBytes(self.connections),
         }) |bytes| total = try std.math.add(usize, total, bytes);
         return total;
     }
@@ -276,11 +286,17 @@ const Slot = struct {
 const Worker = struct {
     server: *Server,
     index: usize,
-    read_fd: c.fd_t,
-    write_fd: c.fd_t,
+    read_fd: if (builtin.os.tag == .windows) i32 else c.fd_t = -1,
+    write_fd: if (builtin.os.tag == .windows) i32 else c.fd_t = -1,
+    event: ?windows.HANDLE = null,
     thread: ?std.Thread = null,
 
     fn init(server: *Server, index: usize) !Worker {
+        if (builtin.os.tag == .windows) {
+            // One startup auto-reset event per worker; notifications coalesce.
+            const event = win32.CreateEventW(null, 0, 0, null) orelse return error.WorkerEventFailed;
+            return .{ .server = server, .index = index, .event = event };
+        }
         var fds: [2]c.fd_t = undefined;
         if (c.pipe(&fds) != 0) return error.WorkerPipeFailed;
         errdefer transport.closeFd(fds[0]);
@@ -289,7 +305,20 @@ const Worker = struct {
         try transport.setFlags(fds[1], true);
         return .{ .server = server, .index = index, .read_fd = fds[0], .write_fd = fds[1] };
     }
+    fn deinit(self: Worker) void {
+        assert(self.thread == null);
+        if (builtin.os.tag == .windows) {
+            windows.CloseHandle(self.event.?);
+        } else {
+            transport.closeFd(self.read_fd);
+            transport.closeFd(self.write_fd);
+        }
+    }
     fn wake(self: *Worker) void {
+        if (builtin.os.tag == .windows) {
+            assert(win32.SetEvent(self.event.?) != 0);
+            return;
+        }
         const byte = [_]u8{1};
         const result = c.write(self.write_fd, &byte, 1);
         if (result < 0) assert(c.errno(result) == .AGAIN or c.errno(result) == .INTR);
@@ -297,19 +326,23 @@ const Worker = struct {
     fn run(self: *Worker) void {
         _ = self.server.ready_workers.fetchAdd(1, .release);
         defer _ = self.server.exited_workers.fetchAdd(1, .release);
-        var bytes: [64]u8 = undefined;
         while (!self.server.stop_workers.load(.acquire)) {
-            // A finite wait makes EINTR/coalesced notification loss harmless.
-            // The published phase is authoritative; pipe bytes are only hints.
-            var ready = [_]c.pollfd{.{ .fd = self.read_fd, .events = c.POLL.IN, .revents = 0 }};
-            const polled = c.poll(&ready, 1, 10);
-            if (polled < 0) {
-                assert(c.errno(polled) == .INTR);
-                continue;
-            }
-            if (polled > 0) {
-                const read = c.read(self.read_fd, &bytes, bytes.len);
-                assert(read > 0 or (read < 0 and c.errno(read) == .INTR));
+            // The phase owns work; finite waits make coalesced wakeups harmless.
+            if (builtin.os.tag == .windows) {
+                const result = win32.WaitForSingleObject(self.event.?, 10);
+                assert(result == 0 or result == 258); // signaled or timeout
+            } else {
+                var ready = [_]c.pollfd{.{ .fd = self.read_fd, .events = c.POLL.IN, .revents = 0 }};
+                const polled = c.poll(&ready, 1, 10);
+                if (polled < 0) {
+                    assert(c.errno(polled) == .INTR);
+                    continue;
+                }
+                if (polled > 0) {
+                    var bytes: [64]u8 = undefined;
+                    const read = c.read(self.read_fd, &bytes, bytes.len);
+                    assert(read > 0 or (read < 0 and c.errno(read) == .INTR));
+                }
             }
             if (self.server.stop_workers.load(.acquire)) break;
             var index = self.index;
@@ -443,10 +476,7 @@ pub const Server = struct {
         }
         self.free_count = config.connections;
         var initialized: usize = 0;
-        errdefer for (workers[0..initialized]) |worker| {
-            transport.closeFd(worker.read_fd);
-            transport.closeFd(worker.write_fd);
-        };
+        errdefer for (workers[0..initialized]) |worker| worker.deinit();
         for (workers, 0..) |*worker, index| {
             worker.* = try Worker.init(self, index);
             initialized += 1;
@@ -472,7 +502,7 @@ pub const Server = struct {
         while (self.ready_workers.load(.acquire) != self.workers.len) {
             // A thread that never reaches its entry point cannot safely be
             // reclaimed in-process. The demo's outer watchdog also covers spawn.
-            if (nowNs() >= startup_deadline) std.c._exit(70);
+            if (nowNs() >= startup_deadline) failFast(70);
             std.Thread.yield() catch {};
         }
         self.started = true;
@@ -673,11 +703,7 @@ pub const Server = struct {
     pub fn deinit(self: *Server) void {
         assert(self.safe_to_destroy);
         assert(self.stats.live_operations == 0 and self.stats.live_connections == 0);
-        for (self.workers) |worker| {
-            assert(worker.thread == null);
-            transport.closeFd(worker.read_fd);
-            transport.closeFd(worker.write_fd);
-        }
+        for (self.workers) |worker| worker.deinit();
         self.backend.deinit();
         self.allocator.free(self.storage);
         self.allocator.free(self.ready);
@@ -715,13 +741,13 @@ pub const Server = struct {
             if (completion.result < 0) return;
             if (self.stopping or self.free_count == 0) {
                 if (!self.stopping) self.stats.rejected += 1;
-                transport.closeFd(completion.result);
+                self.backend.close(self.acceptCell(), completion.result);
                 return;
             }
             if (self.admission) |admission| {
                 if (!admission.admit()) {
                     self.stats.rejected += 1;
-                    transport.closeFd(completion.result);
+                    self.backend.close(self.acceptCell(), completion.result);
                     return;
                 }
             }
@@ -730,14 +756,13 @@ pub const Server = struct {
             assert(!slot.in_use and slot.phase.load(.acquire) == .io);
             slot.generation = try std.math.add(u32, slot.generation, 1);
             slot.fd = completion.result;
-            const send_buffer: c_int = @intCast(self.config.socket_send_buffer_bytes);
-            if (c.setsockopt(slot.fd, c.SOL.SOCKET, c.SO.SNDBUF, &send_buffer, @sizeOf(c_int)) != 0) {
-                transport.closeFd(slot.fd);
+            transport.setSendBuffer(&self.backend, slot.fd, self.config.socket_send_buffer_bytes) catch {
+                self.backend.close(self.acceptCell(), slot.fd);
                 slot.fd = -1;
                 self.stats.rejected += 1;
                 if (self.admission) |admission| admission.release();
                 return;
-            }
+            };
             self.free_count -= 1;
             slot.in_use = true;
             slot.closing = false;
@@ -1456,9 +1481,15 @@ pub const Server = struct {
     }
 
     fn refreshDate(self: *Server) void {
-        var ts: c.timespec = undefined;
-        assert(c.clock_gettime(.REALTIME, &ts) == 0);
-        const seconds: u64 = @intCast(@max(ts.sec, 0));
+        const seconds: u64 = if (builtin.os.tag == .windows) seconds: {
+            const unix_100ns = @as(i128, windows.ntdll.RtlGetSystemTimePrecise()) +
+                @as(i128, std.time.epoch.windows) * 10_000_000;
+            break :seconds @intCast(@divFloor(@max(unix_100ns, 0), 10_000_000));
+        } else seconds: {
+            var ts: c.timespec = undefined;
+            assert(c.clock_gettime(.REALTIME, &ts) == 0);
+            break :seconds @intCast(@max(ts.sec, 0));
+        };
         if (seconds == self.date_second) return;
         self.date_second = seconds;
         const epoch = std.time.epoch.EpochSeconds{ .secs = @min(seconds, 253402300799) };
@@ -1698,7 +1729,7 @@ pub const Cluster = struct {
         }
         const deadline = self.shutdownDeadline();
         while (self.prepared.load(.acquire) != spawned) {
-            if (nowNs() >= deadline) std.c._exit(70);
+            if (nowNs() >= deadline) failFast(70);
             std.Thread.yield() catch {};
         }
         self.started = true;
@@ -1714,7 +1745,7 @@ pub const Cluster = struct {
         // Never join a shard still inside an application callback or waiting
         // for startup release. Its deadline cannot preempt arbitrary code.
         while (self.exited.load(.acquire) != count) {
-            if (nowNs() >= deadline) std.c._exit(70);
+            if (nowNs() >= deadline) failFast(70);
             std.Thread.yield() catch {};
         }
         for (self.threads[1 .. 1 + count]) |*thread| {
@@ -1732,7 +1763,7 @@ pub const Cluster = struct {
             // accepts and safely joins any startup workers before destruction.
             assert(server.stats.live_connections == 0 and server.stats.live_operations == 0);
             server.requestStop();
-            server.run() catch std.c._exit(70);
+            server.run() catch failFast(70);
             assert(server.safe_to_destroy);
         }
     }
@@ -1826,7 +1857,24 @@ fn advanceSendParts(parts: []const c.iovec_const, part: *usize, offset: *usize, 
     unreachable; // Caller proved completion bytes <= the submitted selection.
 }
 
+/// Terminate without unwinding buffers that still have kernel or worker owners.
+pub fn failFast(code: u8) noreturn {
+    if (builtin.os.tag == .windows) {
+        if (win32.TerminateProcess(win32.GetCurrentProcess(), code) == 0) @trap();
+        unreachable;
+    }
+    std.c._exit(code);
+}
+
 pub fn nowNs() u64 {
+    if (builtin.os.tag == .windows) {
+        var counter: windows.LARGE_INTEGER = undefined;
+        var frequency: windows.LARGE_INTEGER = undefined;
+        assert(windows.ntdll.RtlQueryPerformanceCounter(&counter).toBool());
+        assert(windows.ntdll.RtlQueryPerformanceFrequency(&frequency).toBool());
+        assert(counter >= 0 and frequency > 0);
+        return @intCast(@as(u128, @intCast(counter)) * std.time.ns_per_s / @as(u64, @intCast(frequency)));
+    }
     var time: c.timespec = undefined;
     assert(c.clock_gettime(.MONOTONIC, &time) == 0);
     return @as(u64, @intCast(time.sec)) * 1_000_000_000 + @as(u64, @intCast(time.nsec));
@@ -2022,9 +2070,13 @@ const ClusterTestWatchdog = struct {
     fn run(self: *ClusterTestWatchdog) void {
         const deadline = nowNs() + 5_000_000_000;
         while (!self.done.load(.acquire)) {
-            if (nowNs() >= deadline) std.c._exit(71);
-            const delay: c.timespec = .{ .sec = 0, .nsec = 1_000_000 };
-            _ = c.nanosleep(&delay, null);
+            if (nowNs() >= deadline) failFast(71);
+            if (builtin.os.tag == .windows) {
+                win32.Sleep(1);
+            } else {
+                const delay: c.timespec = .{ .sec = 0, .nsec = 1_000_000 };
+                _ = c.nanosleep(&delay, null);
+            }
         }
     }
 };
@@ -2078,7 +2130,7 @@ test "cluster partial spawn failure aborts prepared owners before request I/O" {
             // failing the next spawn. No timing-dependent sleeps or requests.
             const deadline = cluster.shutdownDeadline();
             while (cluster.prepared.load(.acquire) != 1) {
-                if (nowNs() >= deadline) std.c._exit(71);
+                if (nowNs() >= deadline) failFast(71);
                 std.Thread.yield() catch {};
             }
             return error.InjectedSpawnFailure;
@@ -2129,7 +2181,7 @@ test "secondary shard error stops the primary without a duration escape" {
             }
             const deadline = cluster.shutdownDeadline();
             while (!primary_entered.load(.acquire)) {
-                if (nowNs() >= deadline) std.c._exit(71);
+                if (nowNs() >= deadline) failFast(71);
                 std.Thread.yield() catch {};
             }
             // Reconcile this fixture's owners before injecting the error, so

@@ -111,7 +111,7 @@ def run(binary, emit, sessions):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--server", type=Path, default=wire.ROOT / "zig-out/bin/zig-http")
+    parser.add_argument("--server", type=Path, default=wire.SERVER_BINARY)
     parser.add_argument("--timeout", type=int, default=120)
     parser.add_argument("--json", type=Path)
     args = parser.parse_args()
@@ -127,8 +127,10 @@ def main():
         receipt["tests"].append(dict(name=name, ok=True))
         print("PASS " + name, file=sys.stderr, flush=True)
 
-    previous = signal.signal(signal.SIGALRM, watchdog)
-    signal.alarm(args.timeout)
+    previous = None
+    if hasattr(signal, "SIGALRM"):
+        previous = signal.signal(signal.SIGALRM, watchdog)
+        signal.alarm(args.timeout)
     try:
         wire.require(args.server.is_file(), "build the selected Debug/ReleaseSafe server first")
         run(args.server.resolve(), emit, receipt["sessions"])
@@ -137,8 +139,9 @@ def main():
         receipt["error"] = "%s: %s" % (type(error).__name__, error)
         traceback.print_exc(file=sys.stderr)
     finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, previous)
+        if previous is not None:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, previous)
     receipt["seconds"] = round(time.monotonic() - started, 6)
     receipt["passed"] = len(receipt["tests"])
     encoded = json.dumps(receipt, sort_keys=True)

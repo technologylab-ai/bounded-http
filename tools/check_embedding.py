@@ -24,6 +24,11 @@ def require(condition, message):
         raise AssertionError(message)
 
 
+def read_log(path):
+    with path.open('rb') as stream:
+        return stream.read(65536)
+
+
 def response(stream, method):
     status = stream.readline(8193)
     require(status == b"HTTP/1.1 200 OK\r\n", "unexpected response status")
@@ -50,13 +55,15 @@ def response(stream, method):
 def check(binary):
     started = time.monotonic()
     command = [str(binary), "--port", "0", "--duration-ms", "1500"]
-    with tempfile.TemporaryFile(mode="w+b") as log:
-        process = subprocess.Popen(command, stdout=log, stderr=log, start_new_session=True)
+    with tempfile.TemporaryDirectory(prefix="bounded-http-embedding-") as directory, (Path(directory) / "server.log").open("w+b") as log:
+        log_path = Path(directory) / "server.log"
+        process = subprocess.Popen(command, stdout=log, stderr=log,
+                                   start_new_session=(os.name == "posix"))
         try:
             ready = None
             deadline = started + 10
             while time.monotonic() < deadline:
-                ready = re.search(rb"^READY port=(\d+)$", os.pread(log.fileno(), 65536, 0), re.MULTILINE)
+                ready = re.search(rb"^READY port=(\d+)$", read_log(log_path), re.MULTILINE)
                 if ready:
                     break
                 require(process.poll() is None, "example exited before READY")
@@ -79,7 +86,7 @@ def check(binary):
                     require(headers.get(b"connection") == b"close", "close barrier was lost")
                     require(stream.read(1) == b"", "unexpected bytes after the final response")
             process.wait(timeout=max(0.01, deadline - time.monotonic()))
-            output = os.pread(log.fileno(), 65536, 0).decode()
+            output = read_log(log_path).decode()
             require(process.returncode == 0, "example exited unsuccessfully: " + output)
             stats_lines = [line[6:] for line in output.splitlines() if line.startswith("STATS ")]
             require(len(stats_lines) == 1, "missing or duplicate final STATS")
@@ -98,11 +105,17 @@ def check(binary):
                         elapsed_seconds=time.monotonic() - started, server_log=output)
         finally:
             if process.poll() is None:
-                os.killpg(process.pid, signal.SIGTERM)
+                if os.name == "posix":
+                    os.killpg(process.pid, signal.SIGTERM)
+                else:
+                    process.terminate()
                 try:
                     process.wait(timeout=1)
                 except subprocess.TimeoutExpired:
-                    os.killpg(process.pid, signal.SIGKILL)
+                    if os.name == "posix":
+                        os.killpg(process.pid, signal.SIGKILL)
+                    else:
+                        process.kill()
                     process.wait(timeout=2)
 
 
@@ -112,12 +125,14 @@ def main():
     args = parser.parse_args()
     def watchdog(signum, frame):
         raise TimeoutError("embedding probe exceeded its twelve-second watchdog")
-    signal.signal(signal.SIGALRM, watchdog)
-    signal.alarm(12)
+    if hasattr(signal, "SIGALRM"):
+        signal.signal(signal.SIGALRM, watchdog)
+        signal.alarm(12)
     try:
         print(json.dumps(check(args.binary.resolve()), sort_keys=True))
     finally:
-        signal.alarm(0)
+        if hasattr(signal, "SIGALRM"):
+            signal.alarm(0)
 
 
 if __name__ == "__main__":

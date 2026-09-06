@@ -16,7 +16,10 @@ import json
 import os
 from pathlib import Path
 import random
-import resource
+try:
+    import resource
+except ImportError:
+    resource = None
 import signal
 import shutil
 import socket
@@ -218,6 +221,8 @@ def stop(process, server):
 
 
 def main():
+    require(os.name == 'posix' and resource is not None,
+            'Timed comparison requires POSIX process groups and resource accounting; Windows receipts can still be validated')
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('configuration', type=Path)
     parser.add_argument('--output', required=True, type=Path)

@@ -33,6 +33,8 @@ pub fn build(b: *std.Build) void {
     const run = b.addRunArtifact(exe);
     if (b.args) |args| run.addArgs(args);
     b.step("run", "Run the bounded HTTP experiment").dependOn(&run.step);
+    const compile_only = b.step("check", "Compile the selected target without executing its binaries");
+    compile_only.dependOn(&exe.step);
     const verify = b.step("verify", "Compile and test the exact-version MVP");
     verify.dependOn(&exe.step);
     const format = b.addFmt(.{ .paths = &.{ "build.zig", "build.zig.zon", "src", "examples" }, .check = true });
@@ -42,7 +44,8 @@ pub fn build(b: *std.Build) void {
     const embedding_prefix = b.pathFromRoot(b.fmt(".zig-cache/embedding-{s}", .{@tagName(optimize)}));
     const embedding_build = b.addSystemCommand(&.{ b.graph.zig_exe, "build", b.fmt("-Doptimize={s}", .{@tagName(optimize)}), "--prefix", embedding_prefix });
     embedding_build.setCwd(b.path("examples/embedding"));
-    const embedding_check = b.addSystemCommand(&.{ "python3", "tools/check_embedding.py", "--binary", b.pathJoin(&.{ embedding_prefix, "bin", "embedded-http" }) });
+    const embedding_name = if (target.result.os.tag == .windows) "embedded-http.exe" else "embedded-http";
+    const embedding_check = b.addSystemCommand(&.{ "python3", "tools/check_embedding.py", "--binary", b.pathJoin(&.{ embedding_prefix, "bin", embedding_name }) });
     embedding_check.step.dependOn(&embedding_build.step);
     b.step("example-check", "Compile and exercise the independent embedding project").dependOn(&embedding_check.step);
     verify.dependOn(&embedding_check.step);
@@ -54,6 +57,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .link_libc = true,
         }) });
+        compile_only.dependOn(&tests.step);
         const run_tests = b.addRunArtifact(tests);
         verify.dependOn(&run_tests.step);
         test_step.dependOn(&run_tests.step);

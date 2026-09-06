@@ -22,6 +22,7 @@ import traceback
 
 
 ROOT = Path(__file__).resolve().parents[1]
+SERVER_BINARY = ROOT / ("zig-out/bin/zig-http.exe" if os.name == "nt" else "zig-out/bin/zig-http")
 PLAINTEXT = b"Hello, World!"
 REQUEST = b"GET /plaintext HTTP/1.1\r\nHost: localhost\r\n\r\n"
 
@@ -144,12 +145,20 @@ class Server:
             self.ready.set()
 
     def __enter__(self):
+        if os.name == "nt":
+            # Hosted service runners may lack a console. Allocate one for the
+            # harness so child process groups receive explicit CTRL_BREAK events.
+            import ctypes
+            kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+            if kernel.GetConsoleCP() == 0:
+                require(kernel.AllocConsole() != 0, "cannot allocate test control console")
         command = [str(self.binary)]
         for key, value in self.options.items():
             command += ["--" + key.replace("_", "-"), str(value)]
         self.process = subprocess.Popen(command, cwd=ROOT, stdin=subprocess.DEVNULL,
                                         stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-                                        start_new_session=(os.name == "posix"))
+                                        start_new_session=(os.name == "posix"),
+                                        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0)
         self.reader_thread = threading.Thread(target=self._read_log, daemon=True)
         self.reader_thread.start()
         if not self.ready.wait(8) or self.port is None:
@@ -173,11 +182,16 @@ class Server:
                 self.process.kill()
             self.process.wait(timeout=3)
 
+    def request_stop(self):
+        if self.process.poll() is None:
+            # Windows requires a process group and CTRL_BREAK, not SIGINT.
+            self.process.send_signal(signal.CTRL_BREAK_EVENT if os.name == "nt" else signal.SIGINT)
+
     def __exit__(self, kind, value, tb):
         failure = None
         try:
             if self.process.poll() is None:
-                self.process.send_signal(signal.SIGINT)
+                self.request_stop()
             try:
                 code = self.process.wait(timeout=8)
             except subprocess.TimeoutExpired:
@@ -465,7 +479,7 @@ def run_suite(binary, emit, sessions):
             time.sleep(0.05)
             # SIGINT while the two client sockets and finite worker borrow are
             # live. Keep them open until process shutdown has reconciled owners.
-            server.process.send_signal(signal.SIGINT)
+            server.request_stop()
             server.process.wait(timeout=5)
     sessions.append(dict(phase="shutdown", backend=server.backend, stats=server.stats))
     emit("shutdown_with_live_receive_and_worker_borrows", time.monotonic() - start)
@@ -474,7 +488,7 @@ def run_suite(binary, emit, sessions):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--server", type=Path, default=ROOT / "zig-out/bin/zig-http")
+    parser.add_argument("--server", type=Path, default=SERVER_BINARY)
     parser.add_argument("--timeout", type=int, default=90, help="whole-suite watchdog seconds")
     parser.add_argument("--json", type=Path, help="also save the final JSON receipt")
     args = parser.parse_args()
