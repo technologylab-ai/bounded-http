@@ -180,6 +180,11 @@ The [ownership contract](OWNERSHIP.md) describes cancellation races and connecti
 `commit()` records how many initialized bytes the application produced.
 `write()` copies existing bytes into the arena.
 
+A one-shot response adapter can request complete scratch capacity through `callback_output_reserve` before callback dispatch.
+The owner drains older output when that capacity cannot fit, then dispatches the preserved request once.
+Checked draft methods expose unpublished storage without exposing writer lifecycle fields.
+The `response_draft_copy_bytes` counter records staged body copies before publication.
+
 `borrow()` accepts existing request storage or immutable server-lifetime assets.
 The default implementation copies eligible borrowed spans of at most 256 bytes into the arena.
 The `borrow_copies` counter records those copies.

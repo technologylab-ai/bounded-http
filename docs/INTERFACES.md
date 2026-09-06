@@ -71,6 +71,11 @@ XNU API guarantee.
 
 ## Cluster startup and application ownership
 
+`Cluster.requestStopFromSignal()` only sets atomic shard stop flags.
+The caller must retain the cluster throughout signal-handler access.
+The method performs no wake or other system call.
+Ordinary control threads can continue to use `Cluster.requestStop()`.
+
 `Cluster.init` validates the process-wide admitted-connection ceiling and exact
 requested heap plus startup stacks. Each shard reserves full connection storage.
 `Cluster.start` prepares workers and secondary owners behind a release gate;
@@ -82,3 +87,22 @@ external-watchdog requirements. The same application pointer is shared between
 shards: simultaneous handlers on different connections require immutable or
 synchronized application state. Worker dispatch uses a slot-owned header cache
 snapshot; inline dispatch reads its owner's cache directly.
+
+## Unpublished response adapters
+
+`Config.callback_output_reserve` bounds required free arena bytes before initial dispatch.
+The default is `api.header_reserve_bytes`; the configured value must fit `output_bytes`.
+The owner drains older output before dispatch when the reservation cannot fit.
+This admission check preserves each request and prevents callback replay.
+
+`Writer.draftStorage(required_bytes)` exposes only the current fresh response's requested scratch range.
+`Writer.discardDraft()` resets an unpublished response without changing earlier frozen prefixes.
+`Writer.writeDraftBody(bytes)` copies staged body bytes with overlap support and records the copied byte count.
+These methods replace external access to writer fields and internal lifecycle methods.
+
+`Writer.beginWithHeaders(status, content_type, length, extra_headers)` validates the complete head before mutation.
+The writer copies Content-Type and complete CRLF-terminated additional header lines during the call.
+Arena-backed inputs must use disjoint ranges after the current snapshot's `header_reserve_bytes` prefix.
+Those ranges may become committed output during compaction and must not be overwritten afterward.
+The caller reserves sufficient head and draft space before dispatch.
+`Stats.response_draft_copy_bytes` records generated-body compaction separately from borrowed-body copies.
