@@ -19,18 +19,9 @@ with release/acquire ordering. Wake signals are hints; the phase is authoritativ
 | I/O receive/parse | I/O owner appends initialized receive bytes and advances the parser. One transport operation may borrow the destination. |
 | Ready/running callback | Assigned worker borrows the immutable request and exclusively mutates its writer/state. The I/O owner can set the atomic cancellation flag and close networking, but cannot recycle the slot. |
 | Published callback result | I/O owner acquires the committed writer snapshot and action; the worker stops accessing request/writer/state until another dispatch. |
-| Worker flush (`stream_ready`/`stream_wait`) | The callback stack stays live. The owner acquires only the frozen output. The worker waits for output release before continuing. |
 | Sending | I/O owner advances partial-send cursors. Committed payload storage stays immutable until every send using it completes. |
 | Flushed | Writer storage is released/reset and the same handler is dispatched with `.flushed`; the request and continuation state remain borrowed. |
 | Finished/closing | No continuation is promised. Slot storage is reused only after the callback has returned and all target/cancel completions have drained. |
-
-`Context.flushAndWait()` retains the same worker callback across transmission.
-Successful completion publishes `running` after restoring writable capacity.
-Cancellation publishes `running` only after all kernel borrows end.
-The worker then receives `Cancelled` and must return `.close`.
-Only final callback return publishes `result` and permits eventual slot reuse.
-Neither streaming phase ends the application borrow.
-See [worker flush](USING.md#flush-within-a-worker-callback) for the public contract and worker occupancy limit.
 
 The receive buffer stays at a stable address through parsing and all callbacks
 for that request. `Request.method`, `target`, `headers`, `header(name)` results,

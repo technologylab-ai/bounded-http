@@ -5,7 +5,6 @@ const assert = std.debug.assert;
 pub const Action = enum { flush, finish, close };
 pub const Event = enum { request, flushed };
 pub const Handler = *const fn (*Context) Action;
-pub const FlushError = error{ BlockingFlushUnavailable, InvalidState, Cancelled };
 
 pub const Context = struct {
     request: *const http.Request,
@@ -15,31 +14,6 @@ pub const Context = struct {
     state: *[8]usize,
     application: ?*anyopaque,
     cancelled: *const std.atomic.Value(bool),
-    /// The scheduler supplies this hook only for an existing application worker.
-    blocking_flush: ?BlockingFlush = null,
-
-    pub const BlockingFlush = struct {
-        context: *anyopaque,
-        flush: *const fn (*anyopaque) FlushError!void,
-    };
-
-    pub fn supportsBlockingFlush(self: *const Context) bool {
-        return self.blocking_flush != null;
-    }
-
-    /// Send this snapshot and resume the same callback with fresh output capacity.
-    /// The worker waits; the I/O owner continues processing other connections.
-    /// Completion ends the local transport borrow, not the peer's processing.
-    /// After publication, cancellation waits for transport borrows before returning an error.
-    /// The context and writer must remain on their original callback thread.
-    pub fn flushAndWait(self: *Context) FlushError!void {
-        const hook = self.blocking_flush orelse return error.BlockingFlushUnavailable;
-        if (self.cancelled.load(.acquire)) return error.Cancelled;
-        if (self.writer.frozen or self.writer.reserved != 0 or !self.writer.began)
-            return error.InvalidState;
-        _ = self.writer.flush();
-        return hook.flush(hook.context);
-    }
 };
 
 /// Largest response head this framework generates, plus the chunk-size field.
@@ -468,46 +442,6 @@ fn testCache() HeaderCache {
     var cache: HeaderCache = .{};
     cache.refresh("Sat, 05 Sep 2026 12:34:56 GMT");
     return cache;
-}
-
-test "blocking flush rejects unavailable, cancelled and unpublished states without freezing" {
-    var arena: [1024]u8 = undefined;
-    const cache = testCache();
-    var writer = Writer.init(&arena, &cache, 0);
-    writer.open(0, true, false);
-    var request: http.Request = undefined;
-    var state: [8]usize = @splat(0);
-    var cancelled: std.atomic.Value(bool) = .init(false);
-    var called = false;
-    var context: Context = .{
-        .request = &request,
-        .writer = &writer,
-        .event = .request,
-        .state = &state,
-        .application = null,
-        .cancelled = &cancelled,
-    };
-    try std.testing.expect(!context.supportsBlockingFlush());
-    try std.testing.expectError(error.BlockingFlushUnavailable, context.flushAndWait());
-    context.blocking_flush = .{ .context = &called, .flush = struct {
-        fn flush(pointer: *anyopaque) FlushError!void {
-            const value: *bool = @ptrCast(@alignCast(pointer));
-            value.* = true;
-        }
-    }.flush };
-    try std.testing.expect(context.supportsBlockingFlush());
-    try std.testing.expectError(error.InvalidState, context.flushAndWait());
-    try writer.begin(200, "text/plain", null);
-    _ = try writer.reserve(1);
-    try std.testing.expectError(error.InvalidState, context.flushAndWait());
-    writer.commit(0);
-    cancelled.store(true, .release);
-    try std.testing.expectError(error.Cancelled, context.flushAndWait());
-    try std.testing.expect(!writer.frozen and !called);
-    cancelled.store(false, .release);
-    try context.flushAndWait();
-    try std.testing.expect(writer.frozen and called);
-    try std.testing.expectError(error.InvalidState, context.flushAndWait());
 }
 
 test "begin writes the head into the arena and flush keeps the snapshot" {

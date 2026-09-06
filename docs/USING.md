@@ -293,35 +293,6 @@ Return that result immediately.
 The owner completes response framing without another callback for that response.
 Finished responses can remain buffered within a batch before transmission.
 
-### Flush within a worker callback
-
-`Context.supportsBlockingFlush()` reports whether the callback runs on a fixed application worker.
-`Context.flushAndWait()` sends the current snapshot without returning from that callback.
-The method freezes output and waits on the worker's existing notification mechanism.
-The I/O owner continues processing network events and other connections.
-Successful completion restores writable capacity and resumes the same worker stack.
-Application code can then write more output and flush again.
-Return `writer.finish()` after the final write.
-
-This operation requires `.workers` execution and a begun response without an outstanding reservation.
-Inline callbacks receive `BlockingFlushUnavailable` before the writer changes.
-Invalid writer state returns `InvalidState`.
-Disconnect, deadline, shutdown, or response-limit failure can return `Cancelled`.
-On cancellation, return `.close`; do not append output or reuse the frozen writer.
-The original request deadline and cumulative `max_response_bytes` limit remain unchanged across waits.
-
-One active callback occupies one preallocated worker throughout its flush waits and application work.
-Other slots assigned to that worker wait for it to return.
-There is no new request thread, heap allocation, or general asynchronous task scheduler.
-Arbitrary application blocking still requires the existing external watchdog.
-
-The context and writer stay on their original callback thread.
-Cancellation waits for every kernel borrow before unwinding the waiting worker.
-The slot remains retained until the callback also returns.
-Successful flush proves local transmission completion, not peer application receipt.
-HEAD suppresses payload transmission, and empty flushes do not end chunked responses.
-The existing return-and-resume `Writer.flush()` API remains available.
-
 ### Capacity and `WouldBlock`
 
 `Writer.capacity()` reports conservative body capacity after a flush.
