@@ -227,7 +227,7 @@ const Kind = enum(u8) { accept = 1, recv, send, cancel_recv, cancel_send, cancel
 const accept_token: u64 = @intFromEnum(Kind.accept);
 const cancel_accept_token: u64 = @intFromEnum(Kind.cancel_accept);
 
-const BatchNext = enum { parse, resume_flush, close };
+const BatchNext = enum { parse, resume_flush, resume_timer, close };
 
 /// One finished or flushed response snapshot: a range of the connection's
 /// arena, with an optional borrowed span logically inserted at `borrow_at`.
@@ -267,6 +267,9 @@ const Slot = struct {
     state: [8]usize = @splat(0),
     action: api.Action = .close,
     event: api.Event = .request,
+    notify_cancel: bool = false,
+    resume_at: ?u64 = null,
+    wait_delay_ns: ?u64 = null,
     /// A receive into the free input tail and a send of the frozen batch may
     /// be in flight together; each has its own cell and cancel cell.
     recv_pending: bool = false,
@@ -415,6 +418,7 @@ pub const Server = struct {
     now: u64 = 0,
     clock_budget: u32 = 0,
     last_sweep: u64 = 0,
+    next_timer: ?u64 = null,
     header_cache: api.HeaderCache = .{},
     date: [29]u8 = undefined,
     date_second: u64 = std.math.maxInt(u64),
@@ -653,6 +657,7 @@ pub const Server = struct {
                     }
                 }
             }
+            try self.serviceTimers();
             switch (self.config.execution) {
                 .inline_event_loop => {
                     // One pass over the slots that were ready when the turn
@@ -694,6 +699,29 @@ pub const Server = struct {
             worker.thread = null;
         };
         self.safe_to_destroy = true;
+    }
+
+    /// Timer storage belongs to slots. A due timer causes one bounded slot scan.
+    fn serviceTimers(self: *Server) !void {
+        const next = self.next_timer orelse return;
+        if (self.now < next) return;
+        self.next_timer = null;
+        for (self.slots, 0..) |*slot, index| {
+            const at = slot.resume_at orelse continue;
+            assert(slot.in_use and slot.request_active and slot.phase.load(.acquire) == .io);
+            if (slot.closing or self.stopping or self.now >= slot.deadline) {
+                if (!slot.closing and !self.stopping) self.stats.timeouts += 1;
+                try self.beginClose(slot);
+            } else if (slot.send_pending) {
+                // The preceding batch still owns output. Completion rearms the timer.
+            } else if (at <= self.now) {
+                slot.resume_at = null;
+                slot.event = .timer;
+                self.dispatch(index);
+            } else {
+                self.next_timer = @min(self.next_timer orelse at, at);
+            }
+        }
     }
 
     fn anyResult(self: *Server) bool {
@@ -753,6 +781,20 @@ pub const Server = struct {
             } else if (self.stop_requested.load(.acquire) or self.now >= slot.deadline) {
                 if (!self.stop_requested.load(.acquire)) self.stats.timeouts += 1;
                 try self.beginClose(slot);
+            } else if (slot.action == .wait) {
+                const delay = slot.wait_delay_ns orelse {
+                    try self.beginClose(slot);
+                    break;
+                };
+                const at = nowNs() +| delay;
+                slot.resume_at = at;
+                self.next_timer = @min(self.next_timer orelse at, at);
+                if (slot.batch_count != 0) {
+                    // Initial waits cannot retain earlier finished responses in the arena.
+                    assert(!slot.writer.began);
+                    slot.writer.frozen = true;
+                    try self.drainBatch(index, .resume_timer);
+                }
             } else {
                 try self.prepareResponse(index, iteration + 1 < batch_limit);
             }
@@ -1089,6 +1131,8 @@ pub const Server = struct {
             assert(slot.arena.len - slot.arena_used >= self.config.callback_output_reserve);
             slot.writer.open(slot.arena_used, slot.request.keep_alive, slot.request.head_only);
             slot.state = @splat(0);
+            slot.notify_cancel = false;
+            slot.resume_at = null;
             slot.event = .request;
             slot.logical_written = 0;
             self.dispatch(index);
@@ -1186,7 +1230,7 @@ pub const Server = struct {
         const timing = self.config.callback_timing;
         const started = if (timing) nowNs() else 0;
         if (timing) slot.queue_ns = started - slot.queued_at;
-        if (slot.cancelled.load(.acquire)) {
+        if (slot.cancelled.load(.acquire) and slot.event != .cancelled) {
             slot.action = .close;
         } else {
             var streaming: WorkerFlush = .{ .server = self, .slot = slot };
@@ -1197,13 +1241,23 @@ pub const Server = struct {
                 .state = &slot.state,
                 .application = self.application,
                 .cancelled = &slot.cancelled,
-                .blocking_flush = if (self.config.execution == .workers) .{
+                .notify_cancel = slot.notify_cancel,
+                .blocking_flush = if (self.config.execution == .workers and slot.event != .cancelled) .{
                     .context = &streaming,
                     .flush = WorkerFlush.flush,
                 } else null,
             };
             slot.action = self.handler(&context);
-            if (slot.action != .close) assert(slot.writer.frozen);
+            if (slot.event == .cancelled) {
+                // Cleanup cannot publish more bytes or suspend again.
+                slot.action = .close;
+                slot.notify_cancel = false;
+                slot.wait_delay_ns = null;
+            } else {
+                slot.notify_cancel = context.notify_cancel and (slot.action == .flush or slot.action == .wait);
+                slot.wait_delay_ns = if (slot.action == .wait) context.resume_after_ns else null;
+                if (slot.action != .close and slot.action != .wait) assert(slot.writer.frozen);
+            }
         }
         if (timing) slot.handler_ns = nowNs() - started;
         assert(slot.phase.load(.acquire) == .running);
@@ -1484,6 +1538,12 @@ pub const Server = struct {
                     self.dispatch(index);
                 }
             },
+            .resume_timer => {
+                assert(slot.request_active and !slot.writer.began);
+                slot.writer.open(0, slot.request.keep_alive, slot.request.head_only);
+                const at = slot.resume_at.?;
+                self.next_timer = @min(self.next_timer orelse at, at);
+            },
             .close => try self.beginClose(slot),
             .parse => {
                 assert(!slot.request_active and slot.input_cursor <= slot.received);
@@ -1508,6 +1568,7 @@ pub const Server = struct {
     fn beginClose(self: *Server, slot: *Slot) !void {
         const index = (@intFromPtr(slot) - @intFromPtr(self.slots.ptr)) / @sizeOf(Slot);
         slot.closing = true;
+        slot.resume_at = null;
         slot.cancelled.store(true, .release);
         if (slot.fd >= 0) self.backend.shutdown(slot.fd);
         if (slot.recv_pending and !slot.recv_cancel_pending) {
@@ -1550,6 +1611,19 @@ pub const Server = struct {
             return;
         }
         if (phase != .io) return;
+        if (slot.notify_cancel) {
+            // All transport borrows ended. A final application callback still owns state.
+            slot.notify_cancel = false;
+            slot.event = .cancelled;
+            slot.writer.frozen = true;
+            if (self.config.callback_timing) slot.queued_at = nowNs();
+            slot.phase.store(.ready, .release);
+            if (self.config.execution == .workers) {
+                self.stats.worker_dispatches += 1;
+                self.workers[index % self.workers.len].wake();
+            } else self.pushReady(index);
+            return;
+        }
         if (slot.fd >= 0) {
             self.backend.close(self.recvCell(index), slot.fd);
             slot.fd = -1;
@@ -1568,6 +1642,252 @@ pub const Server = struct {
         assert(self.free_count < self.free_slots.len);
         self.free_slots[self.free_count] = @intCast(index);
         self.free_count += 1;
+    }
+
+    test "cancellation callback waits for transport release and retains its application executor" {
+        for ([_]Execution{ .inline_event_loop, .workers }) |execution| {
+            var calls: usize = 0;
+            const server = try Server.init(std.testing.allocator, .{
+                .execution = execution,
+                .workers = if (execution == .workers) 1 else 0,
+                .connections = 1,
+                .port = 0,
+            }, struct {
+                fn handler(ctx: *api.Context) api.Action {
+                    const count: *usize = @ptrCast(@alignCast(ctx.application.?));
+                    assert(ctx.event == .cancelled and ctx.cancelled.load(.acquire));
+                    assert(ctx.writer.frozen and !ctx.supportsBlockingFlush());
+                    assert(ctx.state[0] == 42);
+                    count.* += 1;
+                    return .wait; // The scheduler ignores invalid cleanup actions.
+                }
+            }.handler, &calls);
+            defer server.deinit();
+            const slot = &server.slots[0];
+            slot.in_use = true;
+            slot.closing = true;
+            slot.cancelled.store(true, .release);
+            slot.request_active = true;
+            slot.state[0] = 42;
+            slot.notify_cancel = true;
+            server.stats.live_connections = 1;
+            server.free_count = 0;
+            slot.send_pending = true;
+            server.maybeFree(slot);
+            try std.testing.expect(slot.notify_cancel and slot.phase.load(.acquire) == .io);
+            slot.send_pending = false;
+            slot.send_cancel_pending = true;
+            server.maybeFree(slot);
+            try std.testing.expect(slot.notify_cancel);
+            slot.send_cancel_pending = false;
+            server.maybeFree(slot);
+            try std.testing.expect(slot.in_use and slot.phase.load(.acquire) == .ready);
+            try std.testing.expect(!slot.notify_cancel);
+            server.maybeFree(slot);
+            try std.testing.expectEqual(@as(usize, 0), calls);
+            if (execution == .inline_event_loop) _ = server.popReady();
+            slot.phase.store(.running, .release);
+            server.invokeHandler(slot);
+            try std.testing.expectEqual(@as(usize, 1), calls);
+            try std.testing.expectEqual(api.Action.close, slot.action);
+            try std.testing.expect(slot.in_use);
+            slot.phase.store(.io, .release);
+            server.maybeFree(slot);
+            try std.testing.expect(!slot.in_use and server.free_count == 1);
+            try std.testing.expectEqual(@as(u64, 0), server.stats.live_connections);
+        }
+    }
+
+    test "terminal results disarm cancellation even when cancellation races their publication" {
+        const Shared = struct {
+            calls: usize = 0,
+            finish: bool,
+            cancel_inside: bool,
+            fn handler(ctx: *api.Context) api.Action {
+                const shared: *@This() = @ptrCast(@alignCast(ctx.application.?));
+                assert(ctx.event != .cancelled);
+                shared.calls += 1;
+                ctx.requestCancellation();
+                if (shared.cancel_inside) @constCast(ctx.cancelled).store(true, .release);
+                ctx.state[0] = 0; // The application released its continuation lease.
+                if (!shared.finish) return .close;
+                ctx.writer.begin(200, "text/plain", 0) catch unreachable;
+                return ctx.writer.finish();
+            }
+        };
+        for ([_]bool{ false, true }) |finish| {
+            for ([_]bool{ false, true }) |cancel_inside| {
+                var shared: Shared = .{ .finish = finish, .cancel_inside = cancel_inside };
+                const server = try Server.init(std.testing.allocator, .{
+                    .execution = .workers,
+                    .workers = 1,
+                    .connections = 1,
+                    .port = 0,
+                }, Shared.handler, &shared);
+                defer server.deinit();
+                const slot = &server.slots[0];
+                slot.in_use = true;
+                slot.request_active = true;
+                slot.state[0] = 42;
+                slot.notify_cancel = true;
+                slot.writer.open(0, true, false);
+                server.header_cache.refresh("Sat, 05 Sep 2026 12:34:56 GMT");
+                server.stats.live_connections = 1;
+                server.free_count = 0;
+                slot.phase.store(.running, .release);
+                server.invokeHandler(slot);
+                try std.testing.expect(!slot.notify_cancel);
+                try std.testing.expectEqual(Phase.result, slot.phase.load(.acquire));
+                try server.beginClose(slot);
+                try std.testing.expect(slot.in_use);
+                try server.serviceSlot(0);
+                try std.testing.expect(!slot.in_use);
+                try std.testing.expectEqual(@as(usize, 1), shared.calls);
+                try std.testing.expectEqual(@as(usize, 0), slot.state[0]);
+            }
+        }
+    }
+
+    test "timers release the callback, preserve deadlines, and cancel instead of extending requests" {
+        const server = try Server.init(std.testing.allocator, .{
+            .execution = .inline_event_loop,
+            .workers = 0,
+            .connections = 1,
+            .port = 0,
+        }, struct {
+            fn handler(ctx: *api.Context) api.Action {
+                if (ctx.event == .request) {
+                    ctx.requestCancellation();
+                    return ctx.wait(50) catch .close;
+                }
+                assert(ctx.event == .cancelled);
+                return .close;
+            }
+        }.handler, null);
+        defer server.deinit();
+        const slot = &server.slots[0];
+        slot.writer.open(0, true, false);
+        slot.request_active = true;
+        slot.in_use = true;
+        slot.deadline = nowNs() + std.time.ns_per_s;
+        const deadline = slot.deadline;
+        server.free_count = 0;
+        server.stats.live_connections = 1;
+        server.now = 1; // Deliberately stale turn clock must not shorten a new wait.
+        slot.phase.store(.running, .release);
+        server.invokeHandler(slot);
+        const before = nowNs();
+        try server.serviceSlot(0);
+        const after = nowNs();
+        const at = slot.resume_at.?;
+        try std.testing.expect(at >= before + 50 and at <= after + 50);
+        try std.testing.expectEqual(Phase.io, slot.phase.load(.acquire));
+        server.now = at - 1;
+        try server.serviceTimers();
+        try std.testing.expectEqual(Phase.io, slot.phase.load(.acquire));
+        server.now = at;
+        try server.serviceTimers();
+        try std.testing.expectEqual(api.Event.timer, slot.event);
+        try std.testing.expectEqual(Phase.ready, slot.phase.load(.acquire));
+        try std.testing.expectEqual(deadline, slot.deadline);
+        _ = server.popReady();
+        slot.phase.store(.io, .release);
+        slot.resume_at = deadline + 5;
+        server.next_timer = deadline + 5;
+        server.now = deadline + 5;
+        try server.serviceTimers();
+        try std.testing.expectEqual(api.Event.cancelled, slot.event);
+        try std.testing.expect(slot.resume_at == null and slot.in_use);
+        _ = server.popReady();
+        slot.phase.store(.running, .release);
+        server.invokeHandler(slot);
+        slot.phase.store(.io, .release);
+        server.maybeFree(slot);
+        try std.testing.expect(!slot.in_use);
+    }
+
+    test "a due timer waits for its preceding frozen batch and rearms after release" {
+        const server = try Server.init(std.testing.allocator, .{
+            .execution = .inline_event_loop,
+            .workers = 0,
+            .connections = 1,
+            .port = 0,
+        }, struct {
+            fn handler(_: *api.Context) api.Action {
+                unreachable;
+            }
+        }.handler, null);
+        defer server.deinit();
+        const slot = &server.slots[0];
+        slot.in_use = true;
+        slot.request_active = true;
+        slot.request.keep_alive = true;
+        slot.request.head_only = false;
+        slot.deadline = 1000;
+        slot.resume_at = 123;
+        slot.writer.open(0, true, false);
+        slot.writer.frozen = true;
+        slot.batch_count = 1;
+        slot.cells[0] = .{ .finished = true };
+        slot.batch_next = .resume_timer;
+        slot.send_pending = true;
+        server.stats.live_connections = 1;
+        server.free_count = 0;
+        server.now = 123;
+        server.next_timer = 123;
+        try server.serviceTimers();
+        try std.testing.expectEqual(@as(?u64, 123), slot.resume_at);
+        try std.testing.expect(server.next_timer == null and slot.writer.frozen);
+        try std.testing.expectEqual(Phase.io, slot.phase.load(.acquire));
+        slot.send_pending = false;
+        try server.completeBatch(0);
+        try std.testing.expectEqual(@as(?u64, 123), server.next_timer);
+        try std.testing.expect(!slot.writer.frozen and !slot.writer.began);
+        try server.serviceTimers();
+        try std.testing.expectEqual(api.Event.timer, slot.event);
+        try std.testing.expect(slot.resume_at == null);
+        _ = server.popReady();
+        slot.phase.store(.io, .release);
+        try server.beginClose(slot);
+        try std.testing.expect(!slot.in_use);
+    }
+
+    test "cancelling a queued resume preserves one cancellation callback" {
+        var calls: usize = 0;
+        const server = try Server.init(std.testing.allocator, .{
+            .execution = .workers,
+            .workers = 1,
+            .connections = 1,
+            .port = 0,
+        }, struct {
+            fn handler(ctx: *api.Context) api.Action {
+                assert(ctx.event == .cancelled);
+                const count: *usize = @ptrCast(@alignCast(ctx.application.?));
+                count.* += 1;
+                return .close;
+            }
+        }.handler, &calls);
+        defer server.deinit();
+        const slot = &server.slots[0];
+        slot.in_use = true;
+        slot.request_active = true;
+        slot.event = .timer;
+        slot.notify_cancel = true;
+        slot.cancelled.store(true, .release);
+        server.stats.live_connections = 1;
+        server.free_count = 0;
+        slot.phase.store(.running, .release);
+        server.invokeHandler(slot);
+        try std.testing.expectEqual(@as(usize, 0), calls);
+        try std.testing.expect(slot.notify_cancel);
+        try server.serviceSlot(0);
+        try std.testing.expectEqual(api.Event.cancelled, slot.event);
+        try std.testing.expectEqual(Phase.ready, slot.phase.load(.acquire));
+        slot.phase.store(.running, .release);
+        server.invokeHandler(slot);
+        try server.serviceSlot(0);
+        try std.testing.expectEqual(@as(usize, 1), calls);
+        try std.testing.expect(!slot.in_use);
     }
 
     test "blocking flush resumes the same stack and preserves the request deadline" {
@@ -1637,6 +1957,7 @@ pub const Server = struct {
         }
         slot.in_use = true;
         slot.closing = true;
+        slot.resume_at = null;
         slot.cancelled.store(true, .release);
         slot.phase.store(.stream_wait, .release);
         server.stats.live_connections = 1;

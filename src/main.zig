@@ -30,7 +30,15 @@ fn requestControlStop() void {
     if (active_cluster.load(.seq_cst)) |cluster| cluster.requestStopFromSignal();
 }
 
-const Demo = struct { html: []const u8, stall_ms: u32, execution: framework.Execution };
+const Demo = struct {
+    html: []const u8,
+    stall_ms: u32,
+    execution: framework.Execution,
+    continuation_started: std.atomic.Value(u64) = .init(0),
+    continuation_finished: std.atomic.Value(u64) = .init(0),
+    continuation_cancelled: std.atomic.Value(u64) = .init(0),
+    continuation_live: std.atomic.Value(u64) = .init(0),
+};
 
 pub fn main(init: std.process.Init) !void {
     var config: framework.Config = .{};
@@ -164,14 +172,21 @@ pub fn main(init: std.process.Init) !void {
     const stats = try std.json.Stringify.valueAlloc(init.gpa, merged, .{});
     defer init.gpa.free(stats);
     std.debug.print("STATS {s}\n", .{stats});
+    std.debug.print("CONTINUATIONS started={d} finished={d} cancelled={d} live={d}\n", .{
+        demo.continuation_started.load(.acquire),   demo.continuation_finished.load(.acquire),
+        demo.continuation_cancelled.load(.acquire), demo.continuation_live.load(.acquire),
+    });
 }
 
 fn handler(context: *api.Context) api.Action {
-    return handle(context) catch .close;
+    return handle(context) catch {
+        continuationDone(context, false);
+        return .close;
+    };
 }
 
 fn handle(context: *api.Context) !api.Action {
-    const demo: *const Demo = @ptrCast(@alignCast(context.application.?));
+    const demo: *Demo = @ptrCast(@alignCast(context.application.?));
     const writer = context.writer;
     // Exact-target fast path for the measured route; every other form takes
     // the general route resolution below.
@@ -181,6 +196,21 @@ fn handle(context: *api.Context) !api.Action {
         return writer.finish();
     }
     const path = routePath(context.request.target);
+    if (std.mem.eql(u8, path, "/continuation-counts")) {
+        var buffer: [192]u8 = undefined;
+        const body = try std.fmt.bufPrint(&buffer, "{{\"started\":{d},\"finished\":{d},\"cancelled\":{d},\"live\":{d}}}", .{
+            demo.continuation_started.load(.acquire),   demo.continuation_finished.load(.acquire),
+            demo.continuation_cancelled.load(.acquire), demo.continuation_live.load(.acquire),
+        });
+        try writer.begin(200, "application/json", body.len);
+        const out = try writer.reserve(body.len);
+        @memcpy(out, body);
+        writer.commit(body.len);
+        return writer.finish();
+    }
+    if (std.mem.eql(u8, path, "/timed-chunks") or std.mem.eql(u8, path, "/wait-only") or
+        std.mem.eql(u8, path, "/empty-timer") or std.mem.eql(u8, path, "/abort-after-flush"))
+        return timedContinuation(context, demo, path);
     if (std.mem.eql(u8, context.request.method, "CONNECT")) {
         try writer.begin(501, "text/plain", 0);
         return writer.finish();
@@ -278,6 +308,64 @@ fn handle(context: *api.Context) !api.Action {
         try writer.borrow("not found");
     }
     return writer.finish();
+}
+
+/// Lifecycle fixtures use fixed state and atomics; they never sleep on workers.
+fn timedContinuation(context: *api.Context, demo: *Demo, path: []const u8) !api.Action {
+    const writer = context.writer;
+    if (context.event == .cancelled) {
+        std.debug.assert(writer.frozen and !context.supportsBlockingFlush());
+        std.debug.assert(context.state[7] == 1);
+        continuationDone(context, true);
+        return .close;
+    }
+    if (context.event == .request) {
+        context.state[7] = 1;
+        _ = demo.continuation_live.fetchAdd(1, .monotonic);
+        _ = demo.continuation_started.fetchAdd(1, .release);
+        context.requestCancellation();
+        if (std.mem.eql(u8, path, "/wait-only")) return context.wait(@as(u64, demo.stall_ms) * std.time.ns_per_ms);
+        try writer.begin(200, "text/plain", null);
+        if (!std.mem.eql(u8, path, "/empty-timer")) {
+            const output = try writer.reserve(6);
+            @memcpy(output, "first ");
+            writer.commit(6);
+        }
+        return writer.flush();
+    }
+    if (context.event == .flushed) {
+        if (std.mem.eql(u8, path, "/abort-after-flush")) return error.FixtureAfterFlush;
+        return context.wait(if (std.mem.eql(u8, path, "/empty-timer")) 0 else @as(u64, demo.stall_ms) * std.time.ns_per_ms);
+    }
+    std.debug.assert(context.event == .timer);
+    if (std.mem.eql(u8, path, "/wait-only")) {
+        try writer.begin(200, "text/plain", 4);
+        try writer.borrow("done");
+    } else if (std.mem.eql(u8, path, "/timed-chunks")) {
+        if (context.state[0] == 0) {
+            context.state[0] = 1;
+            try writer.borrow("second ");
+            return writer.flush();
+        }
+        const output = try writer.reserve(5);
+        @memcpy(output, "third");
+        writer.commit(5);
+    }
+    continuationDone(context, false);
+    return writer.finish();
+}
+
+fn continuationDone(context: *api.Context, cancelled: bool) void {
+    if (context.state[7] == 0) return;
+    context.state[7] = 0;
+    const demo: *Demo = @ptrCast(@alignCast(context.application.?));
+    const previous = demo.continuation_live.fetchSub(1, .monotonic);
+    std.debug.assert(previous > 0);
+    if (cancelled) {
+        _ = demo.continuation_cancelled.fetchAdd(1, .release);
+    } else {
+        _ = demo.continuation_finished.fetchAdd(1, .release);
+    }
 }
 
 fn routePath(target: []const u8) []const u8 {

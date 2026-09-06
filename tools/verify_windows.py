@@ -122,6 +122,12 @@ def main():
                        '--timeout', '120', '--json', str(packet / (name + '.json'))], 150)
             wire = json.loads((packet / (name + '.json')).read_text())
             require(wire.get('ok') is True, name + ' did not produce a passing receipt')
+        run('continuation-integration',
+            [sys.executable, 'tests/continuation_integration.py', '--server', str(binary),
+             '--json', str(packet / 'continuation-integration.json')], 150)
+        continuation = json.loads((packet / 'continuation-integration.json').read_text())
+        require(continuation.get('ok') is True and continuation.get('groups') == 9,
+                'Continuation timer/cancellation receipt mismatch')
         run('windows-shards-integration',
             [sys.executable, 'tests/windows_shards_integration.py', '--server', str(binary),
              '--timeout', '120', '--json', str(packet / 'windows-shards-integration.json')], 150)
