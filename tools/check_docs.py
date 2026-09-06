@@ -6,7 +6,7 @@ from pathlib import Path
 import re
 import sys
 import xml.etree.ElementTree as ET
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from render_whitepaper import render
 
@@ -47,6 +47,11 @@ def check_link(path, href, ids=None):
     target = (path.parent / unquote(url.path)).resolve() if url.path else path
     if not target.is_relative_to(ROOT):
         errors.append('{}: relative link leaves this repository: {}'.format(path.relative_to(ROOT), href))
+    if url.path.endswith('read.html'):
+        requested = parse_qs(url.query).get('file', [''])[0]
+        source = (ROOT / requested).resolve()
+        if not requested or not source.is_relative_to(ROOT) or not source.is_file():
+            errors.append('Reader link has an invalid document: ' + href)
     if not target.exists():
         errors.append('{}: missing {}'.format(path.relative_to(ROOT), href))
     if url.fragment and target == path and ids is not None and unquote(url.fragment) not in ids:

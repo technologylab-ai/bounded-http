@@ -1,5 +1,8 @@
 # Bounded Zig HTTP
 
+Read the [published whitepaper](https://technologylab-ai.github.io/zig-http/) in your browser.
+The site includes rendered Markdown guides and syntax highlighting.
+
 Start with the [architecture guide](docs/ARCHITECTURE.md) to understand clusters, ownership, startup, and request processing.
 The [integration guide](docs/USING.md) explains dependency setup, callbacks, resource limits, and response writing.
 The [illustrated whitepaper](docs/whitepaper.html) presents the design and qualified performance results.

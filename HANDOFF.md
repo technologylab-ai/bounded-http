@@ -1,6 +1,11 @@
 # HTTP documentation handoff — 2026-09-06
 
-The architecture documentation is maintained on `docs/server-architecture` in the sibling `zig-http-docs` worktree.
+The architecture documentation is on main; preserve the earlier `docs/server-architecture` worktree.
+The `docs/github-pages` branch adds the public site and Markdown reader.
+Both the HTTP and wiki repositories are public by the user’s 2026-09-06 authorization.
+The [Pages site](https://technologylab-ai.github.io/zig-http/) publishes through `.github/workflows/pages.yml`.
+Run `python3 tools/build_pages.py` to check the explicit publication artifact.
+Run `python3 tools/serve_docs.py` for local Markdown and highlighted-source browsing.
 The delivery extends the arena/shard implementation already adopted into main.
 Runtime source under `src/` remains identical to publication `4b3cd5551d80b422ec6ef763627d019e6f1dfb83`.
 Preserve all earlier reference branches and worktrees.

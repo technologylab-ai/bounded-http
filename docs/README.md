@@ -37,3 +37,38 @@ The renderer performs no runtime measurements.
 Preserve source revisions, environments, sample ranges, and measurement limits when updating performance prose.
 The [writing policy](https://github.com/technologylab-ai/zigllmwiki/blob/main/docs/technical-writing.md) applies to repository prose.
 Code identifiers and exact-format text remain exempt.
+
+## Read and publish on the web
+
+The [public site](https://technologylab-ai.github.io/zig-http/) serves the whitepaper and its architecture and integration guides.
+The browser reader renders Markdown, tables, heading links, diagrams, and highlighted code.
+Source and evidence links open the public GitHub repository at the deployment revision.
+The standalone whitepaper remains readable without JavaScript.
+The Markdown reader requires JavaScript and an HTTP server.
+
+For local browsing, run:
+
+```sh
+python3 tools/serve_docs.py --bind 127.0.0.1 --port 8766
+```
+
+The server converts document navigation into reader URLs.
+The reader requests original bytes with `raw=1`.
+Select a Tailscale address with `--bind` to browse from another device.
+
+Build the publication artifact with:
+
+```sh
+python3 tools/build_pages.py
+```
+
+The builder selects explicit documents and reader assets into `.zig-cache/github-pages`.
+The Pages workflow publishes that directory after relevant changes reach `main`.
+The workflow also supports manual dispatch.
+The workflow does not run Zig compilation or performance measurements.
+
+The reader vendors Marked, DOMPurify, and Highlight.js.
+[The vendor manifest](vendor/manifest.json) pins package versions, archive integrity, and extracted file hashes.
+Adjacent license files preserve each dependency's license terms.
+The site uses no external script or stylesheet service.
+The Zig highlighting rules follow the exact 0.16.0 tokenizer keywords.
