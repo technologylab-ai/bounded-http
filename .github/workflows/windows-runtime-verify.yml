@@ -1,0 +1,139 @@
+name: Windows HTTP runtime verification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bounded-http-windows-runtime-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows-x64:
+    name: Native x64 Windows HTTP
+    runs-on: windows-latest
+    timeout-minutes: 35
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+
+    steps:
+      - name: Prepare the evidence packet
+        shell: pwsh
+        run: |
+          $packet = Join-Path $env:RUNNER_TEMP "bounded-http-windows-runtime"
+          New-Item -ItemType Directory -Force -Path $packet | Out-Null
+          "REVIEW_PACKET=$packet" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Check out the selected revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install checksum-verified exact Zig 0.16.0
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $baseline = (Get-Content -Raw ".zig-version").Trim()
+          if ($baseline -cne "0.16.0") { throw "This gate requires the exact repository 0.16.0 baseline" }
+          $indexUrl = "https://ziglang.org/download/index.json"
+          $headers = @{ "User-Agent" = "bounded-http-windows-verification/1" }
+          $index = Invoke-RestMethod -Uri $indexUrl -Headers $headers -TimeoutSec 30
+          $release = $index.PSObject.Properties[$baseline]
+          if ($null -eq $release) { throw "Official index lacks the requested release" }
+          $entry = $release.Value.PSObject.Properties["x86_64-windows"]
+          if ($null -eq $entry) { throw "Official index lacks the native x64 compiler" }
+          $artifact = $entry.Value
+          $url = [string] $artifact.tarball
+          $expected = ([string] $artifact.shasum).ToLowerInvariant()
+          if ($url -notmatch '^https://ziglang\.org/' -or $expected -notmatch '^[0-9a-f]{64}$') {
+            throw "Invalid official compiler artifact metadata"
+          }
+          $archive = Join-Path $env:RUNNER_TEMP "zig-$baseline-windows.zip"
+          Invoke-WebRequest -Uri $url -Headers $headers -TimeoutSec 180 -OutFile $archive
+          $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
+          if ($actual -cne $expected) { throw "Compiler archive SHA-256 mismatch" }
+          $installation = Join-Path $env:RUNNER_TEMP "bounded-http-zig"
+          Expand-Archive -LiteralPath $archive -DestinationPath $installation -Force
+          $executables = @(Get-ChildItem -Path $installation -Filter "zig.exe" -File -Recurse)
+          if ($executables.Count -ne 1) { throw "Expected exactly one zig.exe" }
+          $bytes = [IO.File]::ReadAllBytes($executables[0].FullName)
+          $pe = [BitConverter]::ToInt32($bytes, 0x3c)
+          if ([BitConverter]::ToUInt16($bytes, 0) -ne 0x5a4d -or
+              [BitConverter]::ToUInt32($bytes, $pe) -ne 0x4550 -or
+              [BitConverter]::ToUInt16($bytes, $pe + 4) -ne 0x8664) {
+            throw "Compiler executable is not native x64 PE"
+          }
+          $executables[0].Directory.FullName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          [ordered]@{
+            index_url = $indexUrl
+            zig_version = $baseline
+            platform = "x86_64-windows"
+            archive_url = $url
+            expected_sha256 = $expected
+            actual_sha256 = $actual
+            actual_bytes = (Get-Item -LiteralPath $archive).Length
+            compiler_pe_machine = "8664"
+          } | ConvertTo-Json | Set-Content -Path (Join-Path $env:REVIEW_PACKET "zig-download.json") -Encoding utf8
+
+      - name: Record native architecture and exact hosted environment
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $architecture = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
+          if ($architecture -cne "X64") { throw "This gate requires native x64 Windows" }
+          $version = (& zig version).Trim()
+          if ($LASTEXITCODE -ne 0 -or $version -cne (Get-Content -Raw ".zig-version").Trim()) {
+            throw "Installed compiler differs from the repository baseline"
+          }
+          $commit = (& git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $commit -cne $env:GITHUB_SHA) { throw "Checkout revision mismatch" }
+          $os = Get-CimInstance Win32_OperatingSystem
+          $release = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+          [ordered]@{
+            repository_commit = $commit
+            workflow_run = $env:GITHUB_RUN_ID
+            workflow_attempt = $env:GITHUB_RUN_ATTEMPT
+            runner_image = $env:ImageOS
+            runner_image_version = $env:ImageVersion
+            os_caption = $os.Caption
+            os_version = $os.Version
+            os_architecture = $architecture
+            windows_full_build = "$($release.CurrentBuild).$($release.UBR)"
+            windows_display_version = $release.DisplayVersion
+            powershell_version = $PSVersionTable.PSVersion.ToString()
+            python = (& python --version)
+            zig_version = $version
+            compiler_execution = "native x64"
+            http_execution = "native x64 Windows IOCP; not cross-compilation evidence"
+            processors = @(Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors)
+            memory_bytes = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory
+            logical_disks = @(Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3" | Select-Object DeviceID, FileSystem, Size)
+          } | ConvertTo-Json -Depth 5 | Tee-Object -FilePath (Join-Path $env:REVIEW_PACKET "host-and-toolchain.json")
+          & zig env 2>&1 | Tee-Object -FilePath (Join-Path $env:REVIEW_PACKET "zig-env.txt")
+          if ($LASTEXITCODE -ne 0) { throw "zig env failed" }
+
+      - name: Run bounded native HTTP gates
+        shell: pwsh
+        run: |
+          & python tools/verify_windows.py --packet $env:REVIEW_PACKET 2>&1 |
+            Tee-Object -FilePath (Join-Path $env:REVIEW_PACKET "orchestrator.log")
+          if ($LASTEXITCODE -ne 0) { throw "Windows HTTP runtime gate failed" }
+
+      - name: Record final checkout state
+        if: always()
+        shell: pwsh
+        run: |
+          $status = @(& git status --porcelain --untracked-files=all 2>&1)
+          if ($LASTEXITCODE -ne 0) { throw "git status failed" }
+          $text = $status -join "`n"
+          Set-Content -Path (Join-Path $env:REVIEW_PACKET "repository-status.txt") -Value $text -Encoding utf8
+          if ($text.Trim()) { throw "Verification changed the checkout: $text" }
+
+      - name: Upload native HTTP evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bounded-http-windows-x64-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/bounded-http-windows-runtime
+          if-no-files-found: error
+          retention-days: 30
