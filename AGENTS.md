@@ -20,6 +20,20 @@ until the named gate passes; do not claim arbitrary application isolation.
 Use subagents for independent parser, transport and lifecycle work. Keep file
 ownership explicit. The parent owns integration, README, docs and build setup.
 
+Repository prose follows Simplified Technical English (ASD-STE100), guided by Zinsser.
+Use one idea per sentence and active voice with a named actor.
+Limit sentences to 20 words, or 25 words for descriptions.
+Define technical terms at first use and use one term per concept.
+Keep each word's meaning and grammatical role consistent.
+Give every pronoun a clear referent.
+Code identifiers, quoted output, error strings, and exact-format text are exempt.
+The [writing policy](https://github.com/technologylab-ai/zigllmwiki/blob/main/docs/technical-writing.md) records the supplied guidance and its scope.
+
+Maintain architecture graphics under `docs/diagrams/`.
+Edit `docs/whitepaper.template.html`, then run `python3 tools/render_whitepaper.py`.
+Run `python3 tools/render_whitepaper.py --check` before publishing documentation.
+The generated whitepaper embeds the canonical SVGs for offline reading.
+
 Before benchmarks, heavy builds or runtime suites on maxross or omarx1, acquire
 `/tmp/zig-http-measurement.lock` with atomic mkdir on the execution host. If it
 exists, hold off; owner.json records who and why. Also inspect pre-existing

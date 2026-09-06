@@ -1,0 +1,770 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="The bounded Zig HTTP server: resource limits, ownership, evented I/O, output arenas, and measured performance.">
+<meta name="color-scheme" content="light">
+<title>Bounded HTTP — Architecture and performance</title>
+<style>
+:root{--paper:#f8f7f1;--white:#fffef9;--ink:#172f40;--muted:#53656b;--line:#d2d7d0;--orange:#d94b2b;--soft:#e5ece8;--serif:Georgia,'Times New Roman',serif;--mono:ui-monospace,SFMono-Regular,Consolas,monospace}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:32px}body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.65 system-ui,-apple-system,'Segoe UI',sans-serif}a{color:inherit;text-decoration-color:#819499;text-underline-offset:4px}a:hover{color:var(--orange)}a:focus-visible,button:focus-visible{outline:3px solid var(--orange);outline-offset:5px}button{font:inherit}::selection{background:#ffd1b9}.skip{position:absolute;top:-100px;left:15px;padding:12px;background:var(--white);z-index:20}.skip:focus{top:12px}.rail{position:fixed;inset:0 auto 0 0;width:234px;padding:36px 26px;border-right:1px solid var(--line);display:flex;flex-direction:column;background:var(--paper);z-index:5}.brand{font-size:18px;font-weight:750;line-height:1.2;letter-spacing:-.8px}.brand small{display:block;color:var(--orange);font:10px/1.8 var(--mono);letter-spacing:1.5px;margin-top:8px}.rail nav{margin-top:66px}.rail nav a{display:flex;gap:14px;padding:9px 0;text-decoration:none;font-size:13px;color:var(--muted);border-bottom:1px solid transparent}.rail nav a span{font:11px/2 var(--mono);color:#748388}.rail nav a[aria-current=true]{color:var(--orange);border-bottom-color:var(--orange)}.rail-footer{margin-top:auto;font:11px/1.8 var(--mono);color:var(--muted)}.rail-footer a{display:block;margin-top:12px}.document{max-width:1410px;margin-left:234px;padding:0 7%;}.topline{display:flex;justify-content:space-between;gap:20px;border-bottom:1px solid var(--line);padding:30px 0 20px;font:11px/1.5 var(--mono);letter-spacing:1.7px;text-transform:uppercase}.edition{color:var(--orange)}.hero{padding:67px 0 48px;position:relative}.eyebrow{font:12px/1.5 var(--mono);letter-spacing:1.6px;text-transform:uppercase;color:var(--orange);margin:0 0 20px}.hero h1{font:clamp(55px,6.1vw,91px)/1.04 var(--serif);letter-spacing:-4px;font-weight:400;margin:0 0 30px;max-width:870px}.hero h1 em{font-weight:400;color:var(--orange)}.lead{max-width:700px;font-size:21px;line-height:1.6;color:var(--muted)}.hero .scope{margin-top:27px;font:12px/1.6 var(--mono);color:var(--muted)}.hero-art{margin-top:40px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:20px 0;display:grid;grid-template-columns:repeat(3,1fr)}.hero-art>div{padding:6px 22px;border-right:1px solid var(--line)}.hero-art>div:first-child{padding-left:0}.hero-art>div:last-child{border:0}.hero-art strong{display:block;font:42px/1.15 var(--serif);letter-spacing:-1px}.hero-art span{display:block;font-size:13px;color:var(--muted);margin-top:10px}.note{color:var(--muted);font-size:13px;line-height:1.65}.section{padding:65px 0;border-top:1px solid var(--line);scroll-margin-top:25px}.section h2{font:clamp(32px,3.4vw,49px)/1.12 var(--serif);letter-spacing:-1.5px;margin:0 0 25px;max-width:820px}.section h3{font-size:19px;line-height:1.4;letter-spacing:-.3px;margin:27px 0 9px}.section p{max-width:800px;margin:0 0 17px}.section .intro{font-size:19px;color:var(--muted);max-width:780px}.two{display:grid;grid-template-columns:1fr 1fr;gap:35px;margin-top:32px}.principle{padding-top:18px;border-top:2px solid var(--ink)}.principle .n{font:12px/1.5 var(--mono);color:var(--orange)}.principle h3{margin-top:12px}.principle p{font-size:15px;line-height:1.7;color:var(--muted)}.callout{background:var(--ink);color:var(--paper);padding:29px 32px;margin:34px 0}.callout strong{font:25px/1.3 var(--serif);display:block;margin-bottom:12px}.callout p{font-size:15px;margin:0;color:#d9e3e4}.terms{display:grid;grid-template-columns:1fr 1fr;gap:0 32px;margin:28px 0}.terms div{padding:18px 0;border-top:1px solid var(--line)}.terms dt{font-size:17px;font-weight:650}.terms dd{font-size:15px;color:var(--muted);margin:5px 0 0;line-height:1.6}.figure{margin:33px 0;background:var(--white);border:1px solid var(--line);padding:22px 24px 15px;border-radius:2px}.figure-scroll{overflow:auto}.figure svg{display:block;width:100%;height:auto}.figure figcaption{border-top:1px solid var(--line);padding-top:15px;margin-top:12px;color:var(--muted);font-size:12px;line-height:1.7}.figure figcaption b{color:var(--orange);font-family:var(--mono);font-size:11px;letter-spacing:1px;margin-right:8px}.table-wrap{overflow:auto;margin:25px 0}table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.55;text-align:left}caption{text-align:left;font-size:12px;color:var(--muted);margin-bottom:12px}th{font:11px/1.6 var(--mono);text-transform:uppercase;letter-spacing:.8px;color:var(--muted);border-bottom:2px solid var(--ink);padding:10px 14px 12px 0}td{padding:14px 14px 14px 0;border-bottom:1px solid var(--line);vertical-align:top}td:last-child,th:last-child{padding-right:0}.numbers td{font-variant-numeric:tabular-nums}.numbers tr.highlight td{background:#e8eee4}.numbers tr.highlight td:first-child{padding-left:10px;border-left:3px solid var(--orange)}code{font: .84em/1.5 var(--mono);color:#8a361f;overflow-wrap:anywhere}pre{padding:22px 24px;background:var(--ink);color:#f8f7f1;overflow:auto;font:13px/1.8 var(--mono);border-left:3px solid var(--orange)}pre code{color:inherit;overflow-wrap:normal;font:inherit}.steps{counter-reset:step;list-style:none;padding:0;margin:30px 0}.steps li{position:relative;padding:0 0 27px 47px;max-width:820px}.steps li:before{counter-increment:step;content:counter(step,decimal-leading-zero);position:absolute;left:0;top:3px;font:12px/1.8 var(--mono);color:var(--orange)}.steps strong{display:block;margin-bottom:5px}.steps p{font-size:15px;color:var(--muted)}.optimization{display:grid;grid-template-columns:40px 1fr;gap:0 14px;padding:22px 0;border-top:1px solid var(--line)}.optimization .tag{font:12px/2 var(--mono);color:var(--orange)}.optimization h3{margin:0 0 8px}.optimization p{font-size:15px;color:var(--muted);margin:0}.cpu-controls{display:none;gap:8px;margin-top:24px}.has-js .cpu-controls{display:flex}.cpu-controls button{border:1px solid var(--ink);padding:8px 17px;background:transparent;color:var(--ink);font-size:13px;cursor:pointer}.cpu-controls button[aria-pressed=true]{background:var(--ink);color:var(--paper)}.has-js .cpu-panel[hidden]{display:none}.refs{font-size:13px;line-height:1.75;padding-left:20px}.refs li{margin:13px 0;overflow-wrap:anywhere}.end{padding:35px 0 60px;border-top:1px solid var(--ink);display:flex;justify-content:space-between;gap:25px;font:11px/1.8 var(--mono);color:var(--muted)}.pill{display:inline-block;border:1px solid var(--line);padding:4px 8px;font:10px/1.5 var(--mono);letter-spacing:.8px;margin-right:8px}.print-button{background:transparent;border:0;border-bottom:1px solid var(--line);padding:0 0 3px;color:var(--muted);font:11px/1.5 var(--mono);cursor:pointer}.no-print{}.diagram-svg{isolation:isolate}
+@media(min-width:1750px){.document{margin-right:auto;padding-left:100px;padding-right:100px}}
+@media(max-width:1050px){.rail{width:190px;padding:27px 20px}.document{margin-left:190px;padding:0 5%}.hero h1{font-size:64px}.hero-art strong{font-size:35px}.hero-art>div{padding:6px 15px}}
+@media(max-width:760px){body{font-size:16px}.rail{position:static;width:100%;padding:20px 6%;border-right:0;border-bottom:1px solid var(--line);display:block}.brand{font-size:16px}.brand small{display:inline;margin-left:15px;font-size:9px}.rail nav,.rail-footer{display:none}.document{margin:0;padding:0 6%}.topline{font-size:9px;padding-top:18px;letter-spacing:1px}.hero{padding:42px 0 28px}.hero h1{font-size:54px;letter-spacing:-2.5px}.lead{font-size:18px}.hero-art{margin-top:28px}.hero-art strong{font-size:30px}.hero-art span{font-size:11px}.hero-art>div{padding:6px 10px}.section{padding:43px 0}.section h2{font-size:36px}.two,.terms{grid-template-columns:1fr;gap:5px}.figure{padding:15px 12px}.figure .diagram-svg{min-width:680px}.figure .chart-svg{min-width:680px}.callout{padding:23px}.end{display:block}.end>div{margin-bottom:15px}.table-wrap{margin-right:-2px}.numbers{min-width:570px}pre{font-size:11px;padding:18px}.section .intro{font-size:17px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@page{size:A4;margin:16mm 14mm}
+@media print{body{background:white;color:#172f40;font-size:10pt;line-height:1.5}.rail,.skip,.no-print,.cpu-controls{display:none!important}.document{max-width:none;margin:0;padding:0}.topline{padding-top:0}.hero{padding:28px 0}.hero h1{font-size:49pt}.lead{font-size:14pt}.section{padding:25px 0;break-before:auto}.section h2{font-size:26pt;break-after:avoid}.section h3{break-after:avoid}.figure{break-inside:avoid;padding:8px;margin:20px 0}.figure-scroll{overflow:visible}.figure svg{min-width:0!important}.two{gap:20px}.terms{grid-template-columns:1fr 1fr}.table-wrap{overflow:visible}.numbers{min-width:0}table{font-size:9pt}tr{break-inside:avoid}.callout{background:#edf0eb;color:#172f40;break-inside:avoid}.callout p{color:#172f40}.cpu-panel[hidden]{display:block!important}.end{padding:20px 0}a{text-decoration:none}.note{font-size:9pt}.hero-art strong{font-size:29pt}.optimization{break-inside:avoid}pre{white-space:pre-wrap;overflow-wrap:anywhere;break-inside:avoid}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<a class="skip" href="#content">Skip to the document</a>
+<aside class="rail" aria-label="Document navigation">
+<div class="brand">BOUNDED / HTTP<small>ENGINEERING PAPER 01</small></div>
+<nav><a href="#principles"><span>01</span> Design principles</a><a href="#startup"><span>02</span> Inside main.zig</a><a href="#cluster"><span>03</span> Cluster and ownership</a><a href="#request"><span>04</span> Request and response</a><a href="#performance"><span>05</span> Less work per response</a><a href="#evidence"><span>06</span> Measured results</a><a href="#embedding"><span>07</span> Use the framework</a><a href="#limits"><span>08</span> Failure and scope</a><a href="#references"><span>09</span> Sources</a></nav>
+<div class="rail-footer">ZIG 0.16.0<br>LINUX + MACOS<br>EXPERIMENTAL FRAMEWORK<a href="ARCHITECTURE.md">Architecture guide ↗</a><a href="USING.md">Integration guide ↗</a></div>
+</aside>
+<main class="document" id="content">
+<div class="topline"><span class="edition">Technology Lab · Systems engineering</span><span>06 September 2026 <button class="print-button no-print" id="print" type="button"> / Print</button></span></div>
+<header class="hero">
+<p class="eyebrow">A bounded HTTP/1.1 framework</p>
+<h1>Fast by design.<br><em>Explicit about limits.</em></h1>
+<p class="lead">The framework reserves its resources before serving requests. Each connection has reserved storage. Small responses share one output buffer.</p>
+<p class="scope"><span class="pill">EXACT ZIG 0.16.0</span><span class="pill">ASSERTIONS ENABLED</span><span class="pill">LOOPBACK EXPERIMENT</span></p>
+<div class="hero-art" aria-label="Default configuration and measured result">
+<div><strong>0</strong><span>Extra application threads<br>Default configuration</span></div>
+<div><strong>128</strong><span>Connections served<br>Default simultaneous limit</span></div>
+<div><strong>90.9%</strong><span>Of comparison throughput<br>Fixed response · Linux</span></div>
+</div>
+<p class="note">The comparison server is libreactor. Each connection had sixteen outstanding requests. Both servers used three logical processors. The ratio compares medians from three trials per configuration. The measurements describe local experiments, not production capacity.</p>
+</header>
+<section class="section" id="principles">
+<p class="eyebrow">01 / Design principles</p><h2>Choose the boundaries.<br>Then own every transition.</h2>
+<p class="intro">HTTP/1.1 is the request-and-response protocol the server implements. Input/output (I/O) connects application code to operating-system resources.</p>
+<p>A socket is an operating-system connection endpoint. A callback is an application function the framework invokes for an event.</p>
+<p>An I/O owner is the thread responsible for one server instance’s network state. A slot reserves storage for one connection.</p>
+<p>An allocator supplies memory. The framework uses an allocator during startup.</p>
+<div class="two">
+<div class="principle"><span class="n">PRINCIPLE 01</span><h3>Reserve before serving.</h3><p>The framework creates buffers, operation records, queues and threads during startup. The demo then seals its framework allocator against further allocations.</p></div>
+<div class="principle"><span class="n">PRINCIPLE 02</span><h3>Refuse excess admission.</h3><p>The framework closes excess accepted connections when the admission ceiling is full. The framework creates no additional request slot.</p></div>
+<div class="principle"><span class="n">PRINCIPLE 03</span><h3>Retain borrowed memory.</h3><p>A borrow grants temporary access to another component’s storage. The owner retains that storage until every dependent operation has finished.</p></div>
+<div class="principle"><span class="n">PRINCIPLE 04</span><h3>Assert internal invariants.</h3><p>An invariant is a condition the implementation must preserve. Assertions check ownership transitions. Malformed HTTP follows ordinary error paths.</p></div>
+</div>
+<div class="callout"><strong>The boundary is a resource contract.</strong><p>The framework bounds its own resources. Application code remains responsible for execution time, shared state and separate allocations.</p></div>
+<p class="note">TigerStyle informs these choices. The implementation retains explicit exceptions, including small payload copies and resources outside its allocator.</p>
+</section>
+<section class="section" id="startup">
+<p class="eyebrow">02 / Inside main.zig</p><h2>The entry point establishes policy.</h2>
+<p><code>src/main.zig</code> connects the demo application to the framework. The entry point parses arguments, loads HTML and establishes resource limits.</p>
+<p><code>std.process.Init</code> supplies process capabilities. The demo uses <code>init.io</code> for startup file access. Custom socket backends handle request I/O.</p>
+<p><code>Budget</code> tracks requested framework bytes and refuses growth beyond its configured ceiling.</p>
+<p>A cluster is a group of server instances with shared admission and startup coordination. <code>Cluster</code> implements that group.</p>
+<figure class="figure"><div class="figure-scroll" tabindex="0" aria-label="Architecture diagram"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 604" role="img" aria-labelledby="startup-title startup-desc" class="diagram-svg">
+<title id="startup-title">Startup separates resource creation from request I/O</title><desc id="startup-desc">main validates configuration, loads assets and initializes the cluster. start prepares threads. main seals the budget before run releases the startup gate.</desc>
+<defs><marker id="startup-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#50636b"/></marker></defs>
+<g font-family="system-ui, -apple-system, Segoe UI, sans-serif"><rect x="28" y="36" width="310" height="493" rx="10" fill="#dce9ed" stroke="#c8d0cb"/><text x="51" y="79" font-size="28" fill="#d94b2b" font-weight="600" text-anchor="start">01</text><text x="51" y="113" font-size="15" fill="#172f40" font-weight="700" text-anchor="start">PREPARE</text><text x="51" y="169" font-size="20" fill="#172f40" font-weight="600" text-anchor="start">Read settings</text><text x="51" y="199" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">main parses arguments and</text><text x="51" y="222" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">validates Config.</text><text x="51" y="285" font-size="20" fill="#172f40" font-weight="600" text-anchor="start">Load assets</text><text x="51" y="315" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">main reads HTML before request</text><text x="51" y="338" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">I/O.</text><text x="51" y="401" font-size="20" fill="#172f40" font-weight="600" text-anchor="start">Reserve resources</text><text x="51" y="431" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">Budget and Cluster allocate</text><text x="51" y="454" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">startup storage.</text><path d="M 338 284 H 384" fill="none" stroke="#50636b" stroke-width="2" marker-end="url(#startup-arrow)"/><rect x="395" y="36" width="310" height="493" rx="10" fill="#e5ecdf" stroke="#c8d0cb"/><text x="418" y="79" font-size="28" fill="#d94b2b" font-weight="600" text-anchor="start">02</text><text x="418" y="113" font-size="15" fill="#172f40" font-weight="700" text-anchor="start">PREPARE THREADS</text><text x="418" y="169" font-size="20" fill="#172f40" font-weight="600" text-anchor="start">Install stop handling</text><text x="418" y="199" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">The demo installs signal</text><text x="418" y="222" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">handlers.</text><text x="418" y="285" font-size="20" fill="#172f40" font-weight="600" text-anchor="start">Call Cluster.start()</text><text x="418" y="315" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">Secondary owners wait behind a</text><text x="418" y="338" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">startup gate.</text><text x="418" y="401" font-size="20" fill="#172f40" font-weight="600" text-anchor="start">Seal Budget</text><text x="418" y="431" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">main refuses later framework</text><text x="418" y="454" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">allocations.</text><path d="M 705 284 H 751" fill="none" stroke="#50636b" stroke-width="2" marker-end="url(#startup-arrow)"/><rect x="762" y="36" width="310" height="493" rx="10" fill="#fbfaf5" stroke="#c8d0cb"/><text x="785" y="79" font-size="28" fill="#d94b2b" font-weight="600" text-anchor="start">03</text><text x="785" y="113" font-size="15" fill="#172f40" font-weight="700" text-anchor="start">SERVE AND CLOSE</text><text x="785" y="169" font-size="20" fill="#172f40" font-weight="600" text-anchor="start">Print READY</text><text x="785" y="199" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">Startup has completed.</text><text x="785" y="285" font-size="20" fill="#172f40" font-weight="600" text-anchor="start">Call Cluster.run()</text><text x="785" y="315" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">The gate opens. Owners process</text><text x="785" y="338" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">requests.</text><text x="785" y="401" font-size="20" fill="#172f40" font-weight="600" text-anchor="start">Finish shutdown</text><text x="785" y="431" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">Owners drain. main reports stats</text><text x="785" y="454" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">and deinitializes.</text><text x="550" y="572" font-size="19" fill="#172f40" font-weight="550" text-anchor="middle">No request I/O crosses the gate before the allocator is sealed.</text></g></svg></div><figcaption><b>FIGURE 01</b> <code>Cluster.start()</code> prepares threads. <code>Cluster.run()</code> opens the startup gate after the demo seals <code>Budget</code>.</figcaption></figure>
+<p>The demo installs signal handlers before preparing threads. Those handlers set atomic stop flags without allocating or invoking callbacks.</p>
+<p>The demo collects statistics after the owners stop. An uncertain failure requires process termination instead of freeing borrowed storage.</p>
+<p class="note">The <a href="ARCHITECTURE.md#startup-and-shutdown">architecture guide</a> maps each startup step to the maintained source.</p>
+</section>
+<section class="section" id="cluster">
+<p class="eyebrow">03 / Cluster and ownership</p><h2>One owner per shard.<br>One ceiling across the cluster.</h2>
+<dl class="terms">
+<div><dt>Shard</dt><dd>A shard is one <code>Server</code> instance with its own listener, backend and connection storage.</dd></div>
+<div><dt>Owner</dt><dd>An owner is the thread responsible for a shard’s I/O state. Shard zero uses the caller’s thread.</dd></div>
+<div><dt>Listener</dt><dd>A listener is a socket that accepts connections. Linux shards use separate listeners on the same port.</dd></div>
+<div><dt>Backend</dt><dd>A backend adapts operating-system I/O to the server’s operation interface.</dd></div>
+<div><dt>Slot</dt><dd>A slot contains one admitted connection’s input, output, parser state and operation identities.</dd></div>
+<div><dt>Arena</dt><dd>An arena is a contiguous output buffer. Several responses can occupy different ranges within that buffer.</dd></div>
+</dl>
+<figure class="figure"><div class="figure-scroll" tabindex="0" aria-label="Architecture diagram"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 595" role="img" aria-labelledby="topology-title topology-desc" class="diagram-svg">
+<title id="topology-title">One cluster, several I/O owners</title><desc id="topology-desc">Three Linux shards have separate listeners, backends and slot storage. One shared counter bounds admitted connections. Shard zero uses the caller thread.</desc>
+<defs><marker id="topology-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#50636b"/></marker></defs>
+<g font-family="system-ui, -apple-system, Segoe UI, sans-serif"><rect x="413" y="16" width="274" height="62" rx="10" fill="#172f40" stroke="#172f40"/><text x="550" y="55" font-size="23" fill="#fbfaf5" font-weight="600" text-anchor="middle">HTTP clients</text><path d="M 550 78 V 109" fill="none" stroke="#50636b" stroke-width="2" marker-end="url(#topology-arrow)"/><text x="550" y="139" font-size="18" fill="#50636b" font-weight="400" text-anchor="middle">Linux distributes connections across listeners</text><rect x="24" y="180" width="1052" height="391" rx="10" fill="#fbfaf5" stroke="#c8d0cb"/><text x="48" y="217" font-size="15" fill="#d94b2b" font-weight="700" text-anchor="start">CLUSTER</text><text x="1050" y="217" font-size="16" fill="#50636b" font-weight="400" text-anchor="end">Example: three Linux shards</text><path d="M 550 152 V 166 H 192 V 243" fill="none" stroke="#50636b" stroke-width="2" marker-end="url(#topology-arrow)"/><rect x="48" y="245" width="288" height="230" rx="10" fill="#dce9ed" stroke="#bdcfd6"/><text x="70" y="281" font-size="23" fill="#172f40" font-weight="650" text-anchor="start">Shard 0</text><text x="70" y="310" font-size="17" fill="#50636b" font-weight="400" text-anchor="start">Caller thread</text><rect x="66" y="329" width="252" height="45" rx="10" fill="#fbfaf5" stroke="#c8d0cb"/><text x="192" y="358" font-size="17" fill="#172f40" font-weight="500" text-anchor="middle">Listener + I/O backend</text><text x="70" y="410" font-size="20" fill="#172f40" font-weight="600" text-anchor="start">128 reserved slots</text><text x="70" y="442" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">Input + output + operation state</text><path d="M 550 152 V 166 H 550 V 243" fill="none" stroke="#50636b" stroke-width="2" marker-end="url(#topology-arrow)"/><rect x="406" y="245" width="288" height="230" rx="10" fill="#dce9ed" stroke="#bdcfd6"/><text x="428" y="281" font-size="23" fill="#172f40" font-weight="650" text-anchor="start">Shard 1</text><text x="428" y="310" font-size="17" fill="#50636b" font-weight="400" text-anchor="start">Startup thread</text><rect x="424" y="329" width="252" height="45" rx="10" fill="#fbfaf5" stroke="#c8d0cb"/><text x="550" y="358" font-size="17" fill="#172f40" font-weight="500" text-anchor="middle">Listener + I/O backend</text><text x="428" y="410" font-size="20" fill="#172f40" font-weight="600" text-anchor="start">128 reserved slots</text><text x="428" y="442" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">Input + output + operation state</text><path d="M 550 152 V 166 H 908 V 243" fill="none" stroke="#50636b" stroke-width="2" marker-end="url(#topology-arrow)"/><rect x="764" y="245" width="288" height="230" rx="10" fill="#dce9ed" stroke="#bdcfd6"/><text x="786" y="281" font-size="23" fill="#172f40" font-weight="650" text-anchor="start">Shard 2</text><text x="786" y="310" font-size="17" fill="#50636b" font-weight="400" text-anchor="start">Startup thread</text><rect x="782" y="329" width="252" height="45" rx="10" fill="#fbfaf5" stroke="#c8d0cb"/><text x="908" y="358" font-size="17" fill="#172f40" font-weight="500" text-anchor="middle">Listener + I/O backend</text><text x="786" y="410" font-size="20" fill="#172f40" font-weight="600" text-anchor="start">128 reserved slots</text><text x="786" y="442" font-size="15" fill="#50636b" font-weight="400" text-anchor="start">Input + output + operation state</text><rect x="48" y="500" width="1004" height="47" rx="10" fill="#e5ecdf" stroke="#c4d0bb"/><text x="550" y="530" font-size="17" fill="#172f40" font-weight="500" text-anchor="middle">Shared admission: 128 total  ·  Shared application state: synchronize mutable data</text></g></svg></div><figcaption><b>FIGURE 02</b> Each shard reserves the full slot capacity. The shared admission counter enforces the total connection ceiling.</figcaption></figure>
+<p>Inline execution runs application callbacks on the I/O owner. Each CPU denotes a logical processor.</p>
+<p>Linux selects one inline shard per allowed CPU, with an automatic maximum of sixteen.</p>
+<p>Explicit Linux configurations support up to sixty-four shards within the resource budget. macOS currently supports one shard.</p>
+<p>The macOS decision follows the recorded listener-distribution experiment. That observation does not establish universal behavior across macOS releases.</p>
+<p>Linux uses a custom <code>io_uring</code> backend. The Linux interface provides submission and completion queues for asynchronous operations.</p>
+<p>macOS uses nonblocking sockets and <code>kqueue</code>. The macOS interface reports readiness. The adapter translates readiness into operation results.</p>
+<div class="callout"><strong>More shards require more reserved memory.</strong><p>Three shards reserve three sets of connection storage. The shared admission ceiling does not divide the reserved slot count between shards.</p></div>
+<div class="table-wrap"><table><caption>Memory scope in the recorded 128-connection configuration</caption><thead><tr><th>Resource</th><th>One shard</th><th>Three shards</th></tr></thead><tbody><tr><td>Requested framework heap</td><td>29,635,986 bytes</td><td>88,907,590 bytes</td></tr><tr><td>Requested secondary-owner stacks</td><td>None</td><td>Two × 1 MiB</td></tr><tr><td>Admitted connections</td><td>128 total</td><td>128 total</td></tr></tbody></table></div>
+<p class="note">The figures exclude kernel queues, allocator overhead, application allocations and actual stack mappings. The heap metric is not process memory usage.</p>
+</section>
+<section class="section" id="request">
+<p class="eyebrow">04 / Request and response</p><h2>The callback returns an action.<br>The owner provides progress.</h2>
+<p>The parser validates syntax and message framing before the first callback. The server receives the complete request within configured bounds.</p>
+<p>Header fields unrelated to framing or connection control remain uninterpreted until application lookup. Lazy interpretation does not bypass header syntax validation.</p>
+<p><code>api.Context</code> provides the request, writer, event, application pointer, cancellation flag and eight state words.</p>
+<p>The framework zeros those words before each request. The words retain application progress across that request’s flush continuations.</p>
+<p><code>.request</code> identifies the initial callback. <code>.flushed</code> identifies a callback after the previous flush completes.</p>
+<p>A response snapshot contains committed output bytes. A batch groups response snapshots from one connection.</p>
+<p>A completion reports an operation’s result. A terminal completion ends the operation’s access to borrowed memory.</p>
+<figure class="figure"><div class="figure-scroll" tabindex="0" aria-label="Architecture diagram"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 800" role="img" aria-labelledby="request-lifecycle-title request-lifecycle-desc" class="diagram-svg">
+<title id="request-lifecycle-title">Request handling returns actions to the I/O owner</title><desc id="request-lifecycle-desc">The owner receives and parses a complete bounded request. A callback returns flush, finish or close. Finished responses can accumulate in a bounded batch before submission. Flush resumes after local transport acceptance. Finish has no flushed event. Closing retains storage until every owner returns.</desc>
+<defs><marker id="request-lifecycle-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#50636b"/></marker></defs>
+<g font-family="system-ui, -apple-system, Segoe UI, sans-serif"><text x="28" y="34" font-size="15" fill="#d94b2b" font-weight="700" text-anchor="start">ONE CONNECTION · DRAIN PATH</text><rect x="28" y="68" width="320" height="105" rx="10" fill="#dce9ed" stroke="#c8d0cb"/><text x="48" y="106" font-size="23" fill="#172f40" font-weight="600" text-anchor="start">Receive</text><text x="48" y="139" font-size="17" fill="#50636b" font-weight="400" text-anchor="start">Reserved input storage</text><rect x="390" y="68" width="320" height="105" rx="10" fill="#dce9ed" stroke="#c8d0cb"/><text x="410" y="106" font-size="23" fill="#172f40" font-weight="600" text-anchor="start">Parse</text><text x="410" y="139" font-size="17" fill="#50636b" font-weight="400" text-anchor="start">Framing and syntax validation</text><rect x="752" y="68" width="320" height="105" rx="10" fill="#dce9ed" stroke="#c8d0cb"/><text x="772" y="106" font-size="23" fill="#172f40" font-weight="600" text-anchor="start">Handle</text><text x="772" y="139" font-size="17" fill="#50636b" font-weight="400" text-anchor="start">Exclusive request/writer access</text><path d="M 348 120 H 386" fill="none" stroke="#50636b" stroke-width="2" marker-end="url(#request-lifecycle-arrow)"/><path d="M 710 120 H 748" fill="none" stroke="#50636b" stroke-width="2" marker-end="url(#request-lifecycle-arrow)"/><path d="M 912 173 V 234 H 550 V 265" fill="none" stroke="#50636b" stroke-width="2" marker-end="url(#request-lifecycle-arrow)"/><text x="769" y="220" font-size="16" fill="#50636b" font-weight="400" text-anchor="start">flush or batch drain</text><path d="M 912 68 V 50 H 550 V 64" fill="none" stroke="#50636b" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#request-lifecycle-arrow)"/><text x="1065" y="34" font-size="14" fill="#50636b" font-weight="400" text-anchor="end">finish + capacity → next buffered request</text><rect x="389" y="269" width="322" height="105" rx="10" fill="#e5ecdf" stroke="#c8d0cb"/><text x="410" y="307" font-size="23" fill="#172f40" font-weight="600" text-anchor="start">Freeze and submit</text><text x="410" y="340" font-size="17" fill="#50636b" font-weight="400" text-anchor="start">Keep response bytes unchanged.</text><path d="M 550 374 V 426" fill="none" stroke="#50636b" stroke-width="2" marker-end="url(#request-lifecycle-arrow)"/><rect x="389" y="430" width="322" height="91" rx="10" fill="#fbfaf5" stroke="#c8d0cb"/><text x="410" y="466" font-size="19" fill="#172f40" font-weight="600" text-anchor="start">Terminal send completion</text><text x="410" y="497" font-size="16" fill="#50636b" font-weight="400" text-anchor="start">Record accepted bytes.</text><path d="M 550 521 V 541" fill="none" stroke="#50636b" stroke-width="2" marker-end="url(#request-lifecycle-arrow)"/><rect x="389" y="545" width="322" height="80" rx="10" fill="#e5ecdf" stroke="#c8d0cb"/><text x="550" y="579" font-size="18" fill="#172f40" font-weight="600" text-anchor="middle">All snapshot bytes accepted?</text><text x="550" y="607" font-size="15" fill="#50636b" font-weight="400" text-anchor="middle">Only now advance the application.</text><path d="M 711 475 H 747 V 321 H 715" fill="none" stroke="#50636b" stroke-width="2" marker-end="url(#request-lifecycle-arrow)"/><text x="778" y="478" font-size="18" fill="#172f40" font-weight="650" text-anchor="start">Partial send</text><text x="778" y="505" font-size="16" fill="#50636b" font-weight="400" text-anchor="start">Submit remaining bytes.</text><path d="M 711 585 H 1061 V 190 H 914 V 177" fill="none" stroke="#50636b" stroke-width="2" marker-end="url(#request-lifecycle-arrow)"/><text x="790" y="397" font-size="18" fill="#172f40" font-weight="650" text-anchor="start">flush → .flushed</text><text x="790" y="424" font-size="16" fill="#50636b" font-weight="400" text-anchor="start">Resume the same request.</text><path d="M 389 585 H 53 V 192 H 187 V 177" fill="none" stroke="#50636b" stroke-width="2" marker-end="url(#request-lifecycle-arrow)"/><text x="82" y="395" font-size="18" fill="#172f40" font-weight="650" text-anchor="start">Batch drained</text><text x="82" y="423" font-size="16" fill="#50636b" font-weight="400" text-anchor="start">Continue with the next input.</text><rect x="28" y="690" width="1044" height="83" rx="10" fill="#f6e7df" stroke="#dfc3b6"/><text x="51" y="724" font-size="20" fill="#172f40" font-weight="650" text-anchor="start">Close or failure</text><text x="51" y="754" font-size="17" fill="#50636b" font-weight="400" text-anchor="start">Cancel outstanding work. Reuse the slot only after application, target and cancel owners return.</text></g></svg></div><figcaption><b>FIGURE 03</b> Flush resumes the same request after local transport acceptance. Finish produces no further callback for that response.</figcaption></figure>
+<div class="table-wrap"><table><thead><tr><th>Writer operation</th><th>Application responsibility</th></tr></thead><tbody>
+<tr><td><code>begin(status, type, length)</code></td><td>Call once per response. A null length selects chunked framing for responses with bodies.</td></tr>
+<tr><td><code>reserve(n)</code> / <code>commit(n)</code></td><td>Generate bytes directly into output storage. Commit only initialized bytes.</td></tr>
+<tr><td><code>write(bytes)</code></td><td>Copy bytes into output storage. Respect remaining capacity.</td></tr>
+<tr><td><code>borrow(bytes)</code></td><td>Use request-owned bytes or immutable storage with server lifetime.</td></tr>
+<tr><td><code>return writer.flush()</code></td><td>Yield immediately. The owner sends every committed byte before the successful resumed callback.</td></tr>
+<tr><td><code>return writer.finish()</code></td><td>End the response. Do not retain request or writer pointers.</td></tr>
+</tbody></table></div>
+<p><code>flush()</code> creates an action. The function does not wait for the network. The callback must return the action immediately.</p>
+<p>The owner can use several sends to exhaust committed output. Local acceptance does not prove peer receipt.</p>
+<p><code>WouldBlock</code> means the current output storage lacks capacity. Flush committed bytes and continue after resume.</p>
+<p>Split generated output into pieces within <code>Writer.capacity()</code>. Repeated flushes cannot satisfy a reservation larger than the arena.</p>
+<p><code>context.state</code> preserves continuation state across callbacks. A continuation records where application work resumes.</p>
+<p>The owner suppresses response body bytes for HEAD requests. The application still accounts for the declared logical body through writer operations.</p>
+<p>Inline callbacks run on the owner thread. Blocking work delays that shard. The framework cannot preempt the callback.</p>
+<p>Explicit worker mode assigns callbacks to fixed startup threads. Worker mode requires one shard and provides no arbitrary application isolation.</p>
+<p>Callbacks on different inline shards can execute concurrently. The application must synchronize shared mutable state.</p>
+</section>
+<section class="section" id="performance">
+<p class="eyebrow">05 / Less work per response</p><h2>Remove repeated work.<br>Preserve ownership.</h2>
+<p class="intro">The implementation changes data layout, dispatch and transport bookkeeping. The same callback and writer contract remains visible to applications.</p>
+<figure class="figure"><div class="figure-scroll" tabindex="0" aria-label="Architecture diagram"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 635" role="img" aria-labelledby="output-arena-title output-arena-desc" class="diagram-svg">
+<title id="output-arena-title">A bounded arena reduces small-response send operations</title><desc id="output-arena-desc">Headers, generated bodies and small copied borrows occupy adjacent arena ranges. Larger borrowed bodies remain separate vectors. SEND handles one selected span; SENDMSG handles several. Partial progress can require more operations.</desc>
+<defs><marker id="output-arena-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#50636b"/></marker></defs>
+<g font-family="system-ui, -apple-system, Segoe UI, sans-serif"><text x="28" y="39" font-size="15" fill="#d94b2b" font-weight="700" text-anchor="start">ONE CONNECTION · OUTPUT ARENA</text><text x="28" y="80" font-size="26" fill="#172f40" font-weight="650" text-anchor="start">Small responses share one contiguous span.</text><rect x="28" y="118" width="122" height="88" rx="0" fill="#dce9ed" stroke="#c8d0cb"/><text x="89.0" y="169" font-size="20" fill="#172f40" font-weight="550" text-anchor="middle">Head A</text><rect x="150" y="118" width="186" height="88" rx="0" fill="#e5ecdf" stroke="#c8d0cb"/><text x="243.0" y="169" font-size="20" fill="#172f40" font-weight="550" text-anchor="middle">Body A</text><rect x="336" y="118" width="122" height="88" rx="0" fill="#dce9ed" stroke="#c8d0cb"/><text x="397.0" y="169" font-size="20" fill="#172f40" font-weight="550" text-anchor="middle">Head B</text><rect x="458" y="118" width="186" height="88" rx="0" fill="#e5ecdf" stroke="#c8d0cb"/><text x="551.0" y="169" font-size="20" fill="#172f40" font-weight="550" text-anchor="middle">Body B</text><rect x="644" y="118" width="122" height="88" rx="0" fill="#dce9ed" stroke="#c8d0cb"/><text x="705.0" y="169" font-size="20" fill="#172f40" font-weight="550" text-anchor="middle">Head C</text><rect x="766" y="118" width="186" height="88" rx="0" fill="#e5ecdf" stroke="#c8d0cb"/><text x="859.0" y="169" font-size="20" fill="#172f40" font-weight="550" text-anchor="middle">Body C</text><rect x="952" y="118" width="120" height="88" rx="0" fill="#f0eee5" stroke="#c8d0cb"/><text x="1012.0" y="169" font-size="16" fill="#50636b" font-weight="400" text-anchor="middle">Free</text><path d="M 490 206 V 245" fill="none" stroke="#50636b" stroke-width="2" marker-end="url(#output-arena-arrow)"/><text x="490" y="278" font-size="21" fill="#172f40" font-weight="650" text-anchor="middle">One selected span → SEND</text><text x="28" y="337" font-size="26" fill="#172f40" font-weight="650" text-anchor="start">Large borrowed bodies remain separate.</text><rect x="28" y="367" width="320" height="88" rx="10" fill="#dce9ed" stroke="#c8d0cb"/><text x="188" y="418" font-size="20" fill="#172f40" font-weight="550" text-anchor="middle">Arena prefix</text><rect x="390" y="367" width="320" height="88" rx="10" fill="#f6e7df" stroke="#dfc3b6"/><text x="550" y="408" font-size="20" fill="#172f40" font-weight="550" text-anchor="middle">Borrowed body</text><text x="550" y="434" font-size="15" fill="#50636b" font-weight="400" text-anchor="middle">Request or immutable asset</text><rect x="752" y="367" width="320" height="88" rx="10" fill="#dce9ed" stroke="#c8d0cb"/><text x="912" y="418" font-size="20" fill="#172f40" font-weight="550" text-anchor="middle">Arena suffix</text><path d="M 348 411 H 386" fill="none" stroke="#50636b" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#output-arena-arrow)"/><path d="M 710 411 H 748" fill="none" stroke="#50636b" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#output-arena-arrow)"/><path d="M 550 455 V 495" fill="none" stroke="#50636b" stroke-width="2" marker-end="url(#output-arena-arrow)"/><text x="550" y="527" font-size="21" fill="#172f40" font-weight="650" text-anchor="middle">Several selected spans → SENDMSG</text><text x="550" y="574" font-size="18" fill="#50636b" font-weight="450" text-anchor="middle">Every referenced byte remains valid until the target send completes.</text><text x="550" y="605" font-size="18" fill="#50636b" font-weight="450" text-anchor="middle">Small borrowed spans may be copied. Kernel socket copies remain.</text></g></svg></div><figcaption><b>FIGURE 04</b> A vector describes a byte span. The transport retains vectors and referenced bytes until completion. Partial progress can require additional sends.</figcaption></figure>
+<div class="optimization"><span class="tag">01</span><div><h3>Run bounded callbacks inline.</h3><p>The default removes application-worker handoffs. The owner invokes the callback directly. Applications select workers when callbacks require finite blocking work.</p></div></div>
+<div class="optimization"><span class="tag">02</span><div><h3>Generate the head once.</h3><p><code>begin()</code> writes the response head into the arena. A cached Date/status prefix avoids repeated general formatting.</p><p>Worker dispatch copies the cache into exclusive slot storage. Inline callbacks read their owner’s cache.</p></div></div>
+<div class="optimization"><span class="tag">03</span><div><h3>Combine small responses.</h3><p>Generated bodies follow their heads. Borrowed spans up to 256 bytes can be copied into the arena when space permits.</p><p>The transport uses SEND for one selected span. The transport uses SENDMSG for several selected vectors.</p></div></div>
+<div class="optimization"><span class="tag">04</span><div><h3>Bound the batch.</h3><p>The default permits 128 response snapshots per connection. The owner submits available output without waiting for a full batch.</p><p>Input compaction occurs only after relevant borrows end. The counter <code>pipeline_copy_bytes</code> records those copies.</p></div></div>
+<div class="optimization"><span class="tag">05</span><div><h3>Visit ready work.</h3><p>A ready ring stores slots awaiting service in first-in, first-out order. A per-shard callback budget bounds each iteration’s dispatch count.</p><p>The owner samples time in groups of sixteen callbacks. A periodic sweep checks idle slots for expired deadlines.</p></div></div>
+<div class="optimization"><span class="tag">06</span><div><h3>Reduce parser overhead.</h3><p>The parser scans lines in sixteen-byte groups. Classification tables and fixed-name comparisons reduce repeated checks while preserving validation.</p><p>The parser writes the request view in place. Applications inspect other header values only when needed.</p></div></div>
+<div class="optimization"><span class="tag">07</span><div><h3>Address operation records directly.</h3><p>An operation cell is reserved storage for one transport operation. Fixed cell addresses replace transport lookup scans.</p><p>The transport references vectors stored by the caller. The caller retains vector metadata until target completion.</p></div></div>
+<div class="optimization"><span class="tag">08</span><div><h3>Add independent I/O owners.</h3><p>Linux shards distribute connection handling across allowed CPUs. Each owner retains its own transport and connection state.</p><p>The shared admission counter preserves one connection ceiling. Extra shards also increase reserved memory.</p></div></div>
+<div class="callout"><strong>Copy avoidance has an explicit boundary.</strong><p>Borrowed parsing avoids a second request payload buffer. Small response copies are deliberate and counted. Ordinary kernel socket copies remain.</p></div>
+<p class="note">The server does not implement SEND_ZC, zero-copy receive or sendfile. Early receive submission and eager submission remain disabled by default.</p>
+<p class="note">The combined comparison measures the resulting implementation. The comparison does not assign a separate speedup to each mechanism.</p>
+</section>
+<section class="section" id="evidence">
+<p class="eyebrow">06 / Measured results</p><h2>A smaller gap.<br>A visible remaining limit.</h2>
+<p>A pipeline contains requests sent before the client receives earlier responses. Pipeline depth counts those outstanding requests per connection.</p>
+<p class="note">On narrow screens, scroll graphics horizontally to inspect every label.</p>
+<p>The harness used 128 connections and depths 1, 16 and 128. Each configuration had three shuffled repetitions.</p>
+<p>Each trial included a one-second warmup and five timed seconds. Four wrk client threads used CPUs 3–7.</p>
+<p>Server configurations used CPU 0 or CPUs 0–2. Zig selected one or three shards within those masks.</p>
+<p>Libreactor used one or three serving processes plus an idle parent. Both contenders returned the thirteen-byte body <code>Hello, World!</code>.</p>
+<div class="cpu-controls no-print" role="group" aria-label="Select server CPU count"><button type="button" data-cpu="3" aria-pressed="true">Three server CPUs</button><button type="button" data-cpu="1" aria-pressed="false">One server CPU</button></div>
+<div class="cpu-panel" data-panel="3"><figure class="figure"><div class="figure-scroll" tabindex="0" aria-label="Three-processor performance chart"><svg xmlns="http://www.w3.org/2000/svg" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:ns2="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" viewBox="0 0 720 345.6" version="1.1" class="chart-svg" role="img" aria-labelledby="performance-3cpu-title performance-3cpu-desc">
+ <metadata>
+  <rdf:RDF>
+   <ns2:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <ns2:Agent>
+      <dc:title>tools/render_performance_figures.py</dc:title>
+     </ns2:Agent>
+    </dc:creator>
+   </ns2:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="performance-3cpu-figure_1">
+  <g id="performance-3cpu-patch_1">
+   <path d="M 0 345.6  L 720 345.6  L 720 0  L 0 0  z " style="fill: #fffef9" />
+  </g>
+  <g id="performance-3cpu-axes_1">
+   <g id="performance-3cpu-patch_2">
+    <path d="M 93.6 279.936  L 698.4 279.936  L 698.4 82.944  L 93.6 82.944  z " style="fill: #fffef9" />
+   </g>
+   <g id="performance-3cpu-matplotlib.axis_1">
+    <g id="performance-3cpu-xtick_1">
+     <g id="performance-3cpu-line2d_1">
+      <path d="M 93.6 279.936  L 93.6 82.944  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-3cpu-line2d_2" />
+     <g id="performance-3cpu-text_1">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="93.6" y="296.294281" transform="rotate(-0 93.6 296.294281)">0</text>
+     </g>
+    </g>
+    <g id="performance-3cpu-xtick_2">
+     <g id="performance-3cpu-line2d_3">
+      <path d="M 169.2 279.936  L 169.2 82.944  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-3cpu-line2d_4" />
+     <g id="performance-3cpu-text_2">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="169.2" y="296.294281" transform="rotate(-0 169.2 296.294281)">2</text>
+     </g>
+    </g>
+    <g id="performance-3cpu-xtick_3">
+     <g id="performance-3cpu-line2d_5">
+      <path d="M 244.8 279.936  L 244.8 82.944  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-3cpu-line2d_6" />
+     <g id="performance-3cpu-text_3">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="244.8" y="296.294281" transform="rotate(-0 244.8 296.294281)">4</text>
+     </g>
+    </g>
+    <g id="performance-3cpu-xtick_4">
+     <g id="performance-3cpu-line2d_7">
+      <path d="M 320.4 279.936  L 320.4 82.944  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-3cpu-line2d_8" />
+     <g id="performance-3cpu-text_4">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="320.4" y="296.294281" transform="rotate(-0 320.4 296.294281)">6</text>
+     </g>
+    </g>
+    <g id="performance-3cpu-xtick_5">
+     <g id="performance-3cpu-line2d_9">
+      <path d="M 396 279.936  L 396 82.944  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-3cpu-line2d_10" />
+     <g id="performance-3cpu-text_5">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="396" y="296.294281" transform="rotate(-0 396 296.294281)">8</text>
+     </g>
+    </g>
+    <g id="performance-3cpu-xtick_6">
+     <g id="performance-3cpu-line2d_11">
+      <path d="M 471.6 279.936  L 471.6 82.944  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-3cpu-line2d_12" />
+     <g id="performance-3cpu-text_6">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="471.6" y="296.294281" transform="rotate(-0 471.6 296.294281)">10</text>
+     </g>
+    </g>
+    <g id="performance-3cpu-xtick_7">
+     <g id="performance-3cpu-line2d_13">
+      <path d="M 547.2 279.936  L 547.2 82.944  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-3cpu-line2d_14" />
+     <g id="performance-3cpu-text_7">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="547.2" y="296.294281" transform="rotate(-0 547.2 296.294281)">12</text>
+     </g>
+    </g>
+    <g id="performance-3cpu-xtick_8">
+     <g id="performance-3cpu-line2d_15">
+      <path d="M 622.8 279.936  L 622.8 82.944  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-3cpu-line2d_16" />
+     <g id="performance-3cpu-text_8">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="622.8" y="296.294281" transform="rotate(-0 622.8 296.294281)">14</text>
+     </g>
+    </g>
+    <g id="performance-3cpu-xtick_9">
+     <g id="performance-3cpu-line2d_17">
+      <path d="M 698.4 279.936  L 698.4 82.944  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-3cpu-line2d_18" />
+     <g id="performance-3cpu-text_9">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="698.4" y="296.294281" transform="rotate(-0 698.4 296.294281)">16</text>
+     </g>
+    </g>
+    <g id="performance-3cpu-text_10">
+     <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="396" y="316.940219" transform="rotate(-0 396 316.940219)">Completed responses per second (millions)</text>
+    </g>
+   </g>
+   <g id="performance-3cpu-matplotlib.axis_2">
+    <g id="performance-3cpu-ytick_1">
+     <g id="performance-3cpu-line2d_19" />
+     <g id="performance-3cpu-text_11">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: end" x="85.6" y="122.073334" transform="rotate(-0 85.6 122.073334)">Depth 1</text>
+     </g>
+    </g>
+    <g id="performance-3cpu-ytick_2">
+     <g id="performance-3cpu-line2d_20" />
+     <g id="performance-3cpu-text_12">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: end" x="85.6" y="185.619141" transform="rotate(-0 85.6 185.619141)">Depth 16</text>
+     </g>
+    </g>
+    <g id="performance-3cpu-ytick_3">
+     <g id="performance-3cpu-line2d_21" />
+     <g id="performance-3cpu-text_13">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: end" x="85.6" y="249.164947" transform="rotate(-0 85.6 249.164947)">Depth 128</text>
+     </g>
+    </g>
+   </g>
+   <g id="performance-3cpu-patch_3">
+    <path d="M 93.6 97.241806  L 114.700561 97.241806  L 114.700561 115.67009  L 93.6 115.67009  z " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #d94b2b" />
+   </g>
+   <g id="performance-3cpu-text_14">
+    <text style="fill: #172f40; font: 10px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="121.13907" y="109.215323" transform="rotate(-0 121.13907 109.215323)">0.558 M/s</text>
+   </g>
+   <g id="performance-3cpu-patch_4">
+    <path d="M 93.6 160.787613  L 306.442655 160.787613  L 306.442655 179.215897  L 93.6 179.215897  z " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #d94b2b" />
+   </g>
+   <g id="performance-3cpu-text_15">
+    <text style="fill: #172f40; font: 10px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="313.080258" y="172.76113" transform="rotate(-0 313.080258 172.76113)">5.631 M/s</text>
+   </g>
+   <g id="performance-3cpu-patch_5">
+    <path d="M 93.6 224.333419  L 544.819767 224.333419  L 544.819767 242.761703  L 93.6 242.761703  z " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #d94b2b" />
+   </g>
+   <g id="performance-3cpu-text_16">
+    <text style="fill: #172f40; font: 10px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="552.805656" y="236.306936" transform="rotate(-0 552.805656 236.306936)">11.937 M/s</text>
+   </g>
+   <g id="performance-3cpu-patch_6">
+    <path d="M 93.6 120.118297  L 115.649073 120.118297  L 115.649073 138.546581  L 93.6 138.546581  z " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40" />
+   </g>
+   <g id="performance-3cpu-text_17">
+    <text style="fill: #172f40; font: 10px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="121.885245" y="132.091814" transform="rotate(-0 121.885245 132.091814)">0.583 M/s</text>
+   </g>
+   <g id="performance-3cpu-patch_7">
+    <path d="M 93.6 183.664103  L 327.800647 183.664103  L 327.800647 202.092387  L 93.6 202.092387  z " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40" />
+   </g>
+   <g id="performance-3cpu-text_18">
+    <text style="fill: #172f40; font: 10px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="333.970062" y="195.63762" transform="rotate(-0 333.970062 195.63762)">6.196 M/s</text>
+   </g>
+   <g id="performance-3cpu-patch_8">
+    <path d="M 93.6 247.20991  L 618.077468 247.20991  L 618.077468 265.638194  L 93.6 265.638194  z " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40" />
+   </g>
+   <g id="performance-3cpu-text_19">
+    <text style="fill: #172f40; font: 10px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="629.807211" y="259.183427" transform="rotate(-0 629.807211 259.183427)">13.875 M/s</text>
+   </g>
+   <g id="performance-3cpu-LineCollection_1">
+    <path d="M 114.512795 106.455948  L 115.09107 106.455948  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 114.512795 106.455948  L 115.09107 106.455948  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #172f40; stroke-width: 1.2" />
+   </g>
+   <g id="performance-3cpu-line2d_22">
+    <path d="M 114.512795 110.455948  L 114.512795 102.455948  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 114.512795 110.455948  L 114.512795 102.455948  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-3cpu-line2d_23">
+    <path d="M 115.09107 110.455948  L 115.09107 102.455948  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 115.09107 110.455948  L 115.09107 102.455948  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-3cpu-LineCollection_2">
+    <path d="M 305.881662 170.001755  L 307.032258 170.001755  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 305.881662 170.001755  L 307.032258 170.001755  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #172f40; stroke-width: 1.2" />
+   </g>
+   <g id="performance-3cpu-line2d_24">
+    <path d="M 305.881662 174.001755  L 305.881662 166.001755  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 305.881662 174.001755  L 305.881662 166.001755  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-3cpu-line2d_25">
+    <path d="M 307.032258 174.001755  L 307.032258 166.001755  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 307.032258 174.001755  L 307.032258 166.001755  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-3cpu-LineCollection_3">
+    <path d="M 543.317138 233.547561  L 546.757656 233.547561  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 543.317138 233.547561  L 546.757656 233.547561  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #172f40; stroke-width: 1.2" />
+   </g>
+   <g id="performance-3cpu-line2d_26">
+    <path d="M 543.317138 237.547561  L 543.317138 229.547561  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 543.317138 237.547561  L 543.317138 229.547561  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-3cpu-line2d_27">
+    <path d="M 546.757656 237.547561  L 546.757656 229.547561  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 546.757656 237.547561  L 546.757656 229.547561  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-3cpu-LineCollection_4">
+    <path d="M 115.382807 129.332439  L 115.837245 129.332439  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 115.382807 129.332439  L 115.837245 129.332439  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #172f40; stroke-width: 1.2" />
+   </g>
+   <g id="performance-3cpu-line2d_28">
+    <path d="M 115.382807 133.332439  L 115.382807 125.332439  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 115.382807 133.332439  L 115.382807 125.332439  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-3cpu-line2d_29">
+    <path d="M 115.837245 133.332439  L 115.837245 125.332439  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 115.837245 133.332439  L 115.837245 125.332439  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-3cpu-LineCollection_5">
+    <path d="M 327.603744 192.878245  L 327.922062 192.878245  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 327.603744 192.878245  L 327.922062 192.878245  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #172f40; stroke-width: 1.2" />
+   </g>
+   <g id="performance-3cpu-line2d_30">
+    <path d="M 327.603744 196.878245  L 327.603744 188.878245  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 327.603744 196.878245  L 327.603744 188.878245  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-3cpu-line2d_31">
+    <path d="M 327.922062 196.878245  L 327.922062 188.878245  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 327.922062 196.878245  L 327.922062 188.878245  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-3cpu-LineCollection_6">
+    <path d="M 613.997441 256.424052  L 623.759211 256.424052  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 613.997441 256.424052  L 623.759211 256.424052  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: none; stroke: #172f40; stroke-width: 1.2" />
+   </g>
+   <g id="performance-3cpu-line2d_32">
+    <path d="M 613.997441 260.424052  L 613.997441 252.424052  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 613.997441 260.424052  L 613.997441 252.424052  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-3cpu-line2d_33">
+    <path d="M 623.759211 260.424052  L 623.759211 252.424052  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 623.759211 260.424052  L 623.759211 252.424052  " clip-path="url(#performance-3cpu-pee9dcbacf3)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-3cpu-legend_1">
+    <g id="performance-3cpu-patch_9">
+     <path d="M 503.187812 68.786424  L 525.187812 68.786424  L 525.187812 61.086424  L 503.187812 61.086424  z " style="fill: #d94b2b" />
+    </g>
+    <g id="performance-3cpu-text_20">
+     <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="533.987812" y="68.786424" transform="rotate(-0 533.987812 68.786424)">Zig HTTP</text>
+    </g>
+    <g id="performance-3cpu-patch_10">
+     <path d="M 605.207656 68.786424  L 627.207656 68.786424  L 627.207656 61.086424  L 605.207656 61.086424  z " style="fill: #172f40" />
+    </g>
+    <g id="performance-3cpu-text_21">
+     <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="636.007656" y="68.786424" transform="rotate(-0 636.007656 68.786424)">libreactor</text>
+    </g>
+   </g>
+  </g>
+  <g id="performance-3cpu-text_22">
+   <text style="fill: #172f40; font: 700 19px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="93.6" y="22.464" transform="rotate(-0 93.6 22.464)">Three allowed server CPUs</text>
+  </g>
+  <g id="performance-3cpu-text_23">
+   <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="93.6" y="44.928" transform="rotate(-0 93.6 44.928)">128 connections · 3 trials · 5 seconds each</text>
+  </g>
+  <g id="performance-3cpu-text_24">
+   <text style="fill: #172f40; font: 9px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="93.6" y="330.048" transform="rotate(-0 93.6 330.048)">Bars: medians · Whiskers: observed min–max · Closed-loop HTTP/1.1</text>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="performance-3cpu-pee9dcbacf3">
+   <rect x="93.6" y="82.944" width="604.8" height="196.992" />
+  </clipPath>
+ </defs>
+<title id="performance-3cpu-title">Three allowed server CPUs</title><desc id="performance-3cpu-desc">Depth 1: zig-http median 0.558216 million responses/s; range 0.553249 to 0.568547. Depth 16: zig-http median 5.630758 million responses/s; range 5.615917 to 5.646356. Depth 128: zig-http median 11.937031 million responses/s; range 11.897279 to 11.988298. Depth 1: libreactor median 0.583309 million responses/s; range 0.576265 to 0.588287. Depth 16: libreactor median 6.195784 million responses/s; range 6.190575 to 6.198996. Depth 128: libreactor median 13.875065 million responses/s; range 13.767128 to 14.025376.</desc></svg></div><figcaption><b>FIGURE 05A</b> Three server CPUs. Bars show medians; whiskers show the minimum and maximum across three trials.</figcaption></figure></div>
+<div class="cpu-panel" data-panel="1"><figure class="figure"><div class="figure-scroll" tabindex="0" aria-label="One-processor performance chart"><svg xmlns="http://www.w3.org/2000/svg" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:ns2="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" viewBox="0 0 720 345.6" version="1.1" class="chart-svg" role="img" aria-labelledby="performance-1cpu-title performance-1cpu-desc">
+ <metadata>
+  <rdf:RDF>
+   <ns2:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <ns2:Agent>
+      <dc:title>tools/render_performance_figures.py</dc:title>
+     </ns2:Agent>
+    </dc:creator>
+   </ns2:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="performance-1cpu-figure_1">
+  <g id="performance-1cpu-patch_1">
+   <path d="M 0 345.6  L 720 345.6  L 720 0  L 0 0  z " style="fill: #fffef9" />
+  </g>
+  <g id="performance-1cpu-axes_1">
+   <g id="performance-1cpu-patch_2">
+    <path d="M 93.6 279.936  L 698.4 279.936  L 698.4 82.944  L 93.6 82.944  z " style="fill: #fffef9" />
+   </g>
+   <g id="performance-1cpu-matplotlib.axis_1">
+    <g id="performance-1cpu-xtick_1">
+     <g id="performance-1cpu-line2d_1">
+      <path d="M 93.6 279.936  L 93.6 82.944  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-1cpu-line2d_2" />
+     <g id="performance-1cpu-text_1">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="93.6" y="296.294281" transform="rotate(-0 93.6 296.294281)">0</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-xtick_2">
+     <g id="performance-1cpu-line2d_3">
+      <path d="M 169.2 279.936  L 169.2 82.944  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-1cpu-line2d_4" />
+     <g id="performance-1cpu-text_2">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="169.2" y="296.294281" transform="rotate(-0 169.2 296.294281)">2</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-xtick_3">
+     <g id="performance-1cpu-line2d_5">
+      <path d="M 244.8 279.936  L 244.8 82.944  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-1cpu-line2d_6" />
+     <g id="performance-1cpu-text_3">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="244.8" y="296.294281" transform="rotate(-0 244.8 296.294281)">4</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-xtick_4">
+     <g id="performance-1cpu-line2d_7">
+      <path d="M 320.4 279.936  L 320.4 82.944  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-1cpu-line2d_8" />
+     <g id="performance-1cpu-text_4">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="320.4" y="296.294281" transform="rotate(-0 320.4 296.294281)">6</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-xtick_5">
+     <g id="performance-1cpu-line2d_9">
+      <path d="M 396 279.936  L 396 82.944  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-1cpu-line2d_10" />
+     <g id="performance-1cpu-text_5">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="396" y="296.294281" transform="rotate(-0 396 296.294281)">8</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-xtick_6">
+     <g id="performance-1cpu-line2d_11">
+      <path d="M 471.6 279.936  L 471.6 82.944  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-1cpu-line2d_12" />
+     <g id="performance-1cpu-text_6">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="471.6" y="296.294281" transform="rotate(-0 471.6 296.294281)">10</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-xtick_7">
+     <g id="performance-1cpu-line2d_13">
+      <path d="M 547.2 279.936  L 547.2 82.944  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-1cpu-line2d_14" />
+     <g id="performance-1cpu-text_7">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="547.2" y="296.294281" transform="rotate(-0 547.2 296.294281)">12</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-xtick_8">
+     <g id="performance-1cpu-line2d_15">
+      <path d="M 622.8 279.936  L 622.8 82.944  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-1cpu-line2d_16" />
+     <g id="performance-1cpu-text_8">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="622.8" y="296.294281" transform="rotate(-0 622.8 296.294281)">14</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-xtick_9">
+     <g id="performance-1cpu-line2d_17">
+      <path d="M 698.4 279.936  L 698.4 82.944  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-1cpu-line2d_18" />
+     <g id="performance-1cpu-text_9">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="698.4" y="296.294281" transform="rotate(-0 698.4 296.294281)">16</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-text_10">
+     <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="396" y="316.940219" transform="rotate(-0 396 316.940219)">Completed responses per second (millions)</text>
+    </g>
+   </g>
+   <g id="performance-1cpu-matplotlib.axis_2">
+    <g id="performance-1cpu-ytick_1">
+     <g id="performance-1cpu-line2d_19" />
+     <g id="performance-1cpu-text_11">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: end" x="85.6" y="122.073334" transform="rotate(-0 85.6 122.073334)">Depth 1</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-ytick_2">
+     <g id="performance-1cpu-line2d_20" />
+     <g id="performance-1cpu-text_12">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: end" x="85.6" y="185.619141" transform="rotate(-0 85.6 185.619141)">Depth 16</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-ytick_3">
+     <g id="performance-1cpu-line2d_21" />
+     <g id="performance-1cpu-text_13">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: end" x="85.6" y="249.164947" transform="rotate(-0 85.6 249.164947)">Depth 128</text>
+     </g>
+    </g>
+   </g>
+   <g id="performance-1cpu-patch_3">
+    <path d="M 93.6 97.241806  L 107.376114 97.241806  L 107.376114 115.67009  L 93.6 115.67009  z " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #d94b2b" />
+   </g>
+   <g id="performance-1cpu-text_14">
+    <text style="fill: #172f40; font: 10px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="113.490762" y="109.215323" transform="rotate(-0 113.490762 109.215323)">0.364 M/s</text>
+   </g>
+   <g id="performance-1cpu-patch_4">
+    <path d="M 93.6 160.787613  L 222.282353 160.787613  L 222.282353 179.215897  L 93.6 179.215897  z " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #d94b2b" />
+   </g>
+   <g id="performance-1cpu-text_15">
+    <text style="fill: #172f40; font: 10px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="228.64588" y="172.76113" transform="rotate(-0 228.64588 172.76113)">3.404 M/s</text>
+   </g>
+   <g id="performance-1cpu-patch_5">
+    <path d="M 93.6 224.333419  L 420.695298 224.333419  L 420.695298 242.761703  L 93.6 242.761703  z " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #d94b2b" />
+   </g>
+   <g id="performance-1cpu-text_16">
+    <text style="fill: #172f40; font: 10px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="428.783104" y="236.306936" transform="rotate(-0 428.783104 236.306936)">8.653 M/s</text>
+   </g>
+   <g id="performance-1cpu-patch_6">
+    <path d="M 93.6 120.118297  L 106.055492 120.118297  L 106.055492 138.546581  L 93.6 138.546581  z " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40" />
+   </g>
+   <g id="performance-1cpu-text_17">
+    <text style="fill: #172f40; font: 10px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="112.152702" y="132.091814" transform="rotate(-0 112.152702 132.091814)">0.330 M/s</text>
+   </g>
+   <g id="performance-1cpu-patch_7">
+    <path d="M 93.6 183.664103  L 258.940881 183.664103  L 258.940881 202.092387  L 93.6 202.092387  z " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40" />
+   </g>
+   <g id="performance-1cpu-text_18">
+    <text style="fill: #172f40; font: 10px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="267.946885" y="195.63762" transform="rotate(-0 267.946885 195.63762)">4.374 M/s</text>
+   </g>
+   <g id="performance-1cpu-patch_8">
+    <path d="M 93.6 247.20991  L 642.367928 247.20991  L 642.367928 265.638194  L 93.6 265.638194  z " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40" />
+   </g>
+   <g id="performance-1cpu-text_19">
+    <text style="fill: #172f40; font: 10px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="651.607635" y="259.183427" transform="rotate(-0 651.607635 259.183427)">14.518 M/s</text>
+   </g>
+   <g id="performance-1cpu-LineCollection_1">
+    <path d="M 107.299588 106.455948  L 107.442762 106.455948  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 107.299588 106.455948  L 107.442762 106.455948  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #172f40; stroke-width: 1.2" />
+   </g>
+   <g id="performance-1cpu-line2d_22">
+    <path d="M 107.299588 110.455948  L 107.299588 102.455948  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 107.299588 110.455948  L 107.299588 102.455948  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-line2d_23">
+    <path d="M 107.442762 110.455948  L 107.442762 102.455948  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 107.442762 110.455948  L 107.442762 102.455948  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-LineCollection_2">
+    <path d="M 220.641039 170.001755  L 222.59788 170.001755  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 220.641039 170.001755  L 222.59788 170.001755  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #172f40; stroke-width: 1.2" />
+   </g>
+   <g id="performance-1cpu-line2d_24">
+    <path d="M 220.641039 174.001755  L 220.641039 166.001755  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 220.641039 174.001755  L 220.641039 166.001755  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-line2d_25">
+    <path d="M 222.59788 174.001755  L 222.59788 166.001755  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 222.59788 174.001755  L 222.59788 166.001755  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-LineCollection_3">
+    <path d="M 353.934965 233.547561  L 422.735104 233.547561  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 353.934965 233.547561  L 422.735104 233.547561  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #172f40; stroke-width: 1.2" />
+   </g>
+   <g id="performance-1cpu-line2d_26">
+    <path d="M 353.934965 237.547561  L 353.934965 229.547561  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 353.934965 237.547561  L 353.934965 229.547561  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-line2d_27">
+    <path d="M 422.735104 237.547561  L 422.735104 229.547561  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 422.735104 237.547561  L 422.735104 229.547561  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-LineCollection_4">
+    <path d="M 106.049431 129.332439  L 106.104702 129.332439  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 106.049431 129.332439  L 106.104702 129.332439  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #172f40; stroke-width: 1.2" />
+   </g>
+   <g id="performance-1cpu-line2d_28">
+    <path d="M 106.049431 133.332439  L 106.049431 125.332439  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 106.049431 133.332439  L 106.049431 125.332439  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-line2d_29">
+    <path d="M 106.104702 133.332439  L 106.104702 125.332439  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 106.104702 133.332439  L 106.104702 125.332439  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-LineCollection_5">
+    <path d="M 255.410561 192.878245  L 261.898885 192.878245  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 255.410561 192.878245  L 261.898885 192.878245  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #172f40; stroke-width: 1.2" />
+   </g>
+   <g id="performance-1cpu-line2d_30">
+    <path d="M 255.410561 196.878245  L 255.410561 188.878245  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 255.410561 196.878245  L 255.410561 188.878245  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-line2d_31">
+    <path d="M 261.898885 196.878245  L 261.898885 188.878245  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 261.898885 196.878245  L 261.898885 188.878245  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-LineCollection_6">
+    <path d="M 638.586532 256.424052  L 645.559635 256.424052  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 638.586532 256.424052  L 645.559635 256.424052  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #172f40; stroke-width: 1.2" />
+   </g>
+   <g id="performance-1cpu-line2d_32">
+    <path d="M 638.586532 260.424052  L 638.586532 252.424052  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 638.586532 260.424052  L 638.586532 252.424052  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-line2d_33">
+    <path d="M 645.559635 260.424052  L 645.559635 252.424052  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 645.559635 260.424052  L 645.559635 252.424052  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-legend_1">
+    <g id="performance-1cpu-patch_9">
+     <path d="M 503.187812 68.786424  L 525.187812 68.786424  L 525.187812 61.086424  L 503.187812 61.086424  z " style="fill: #d94b2b" />
+    </g>
+    <g id="performance-1cpu-text_20">
+     <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="533.987812" y="68.786424" transform="rotate(-0 533.987812 68.786424)">Zig HTTP</text>
+    </g>
+    <g id="performance-1cpu-patch_10">
+     <path d="M 605.207656 68.786424  L 627.207656 68.786424  L 627.207656 61.086424  L 605.207656 61.086424  z " style="fill: #172f40" />
+    </g>
+    <g id="performance-1cpu-text_21">
+     <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="636.007656" y="68.786424" transform="rotate(-0 636.007656 68.786424)">libreactor</text>
+    </g>
+   </g>
+  </g>
+  <g id="performance-1cpu-text_22">
+   <text style="fill: #172f40; font: 700 19px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="93.6" y="22.464" transform="rotate(-0 93.6 22.464)">One allowed server CPU</text>
+  </g>
+  <g id="performance-1cpu-text_23">
+   <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="93.6" y="44.928" transform="rotate(-0 93.6 44.928)">128 connections · 3 trials · 5 seconds each</text>
+  </g>
+  <g id="performance-1cpu-text_24">
+   <text style="fill: #172f40; font: 9px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="93.6" y="330.048" transform="rotate(-0 93.6 330.048)">Bars: medians · Whiskers: observed min–max · Closed-loop HTTP/1.1</text>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="performance-1cpu-p04a84bdc63">
+   <rect x="93.6" y="82.944" width="604.8" height="196.992" />
+  </clipPath>
+ </defs>
+<title id="performance-1cpu-title">One allowed server CPU</title><desc id="performance-1cpu-desc">Depth 1: zig-http median 0.364447 million responses/s; range 0.362423 to 0.366211. Depth 16: zig-http median 3.404295 million responses/s; range 3.360874 to 3.412642. Depth 128: zig-http median 8.653315 million responses/s; range 6.887168 to 8.707278. Depth 1: libreactor median 0.329510 million responses/s; range 0.329350 to 0.330812. Depth 16: libreactor median 4.374097 million responses/s; range 4.280703 to 4.452351. Depth 128: libreactor median 14.517670 million responses/s; range 14.417633 to 14.602107.</desc></svg></div><figcaption><b>FIGURE 05B</b> One server CPU. The deepest pipeline retains a substantial efficiency gap.</figcaption></figure></div>
+<div class="table-wrap"><table class="numbers"><caption>Qualified Linux comparison · median responses per second</caption><thead><tr><th>Server CPUs</th><th>Pipeline depth</th><th>Zig</th><th>libreactor</th><th>Zig / libreactor</th></tr></thead><tbody>
+<tr><td>1</td><td>1</td><td>364,447</td><td>329,510</td><td>1.106</td></tr><tr><td>1</td><td>16</td><td>3,404,295</td><td>4,374,097</td><td>0.778</td></tr><tr><td>1</td><td>128</td><td>8,653,315</td><td>14,517,670</td><td>0.596</td></tr>
+<tr><td>3</td><td>1</td><td>558,216</td><td>583,309</td><td>0.957</td></tr><tr class="highlight"><td>3</td><td>16</td><td>5,630,758</td><td>6,195,784</td><td>0.909</td></tr><tr><td>3</td><td>128</td><td>11,937,031</td><td>13,875,065</td><td>0.860</td></tr>
+</tbody></table></div>
+<p>All thirty-six trials and warmups passed. The harness counted 1,053,649,993 timed responses and validated 3,840 exact preflight responses.</p>
+<p>The preflight checks validate complete bodies and required headers. Timed wrk checks validate framing, status and errors.</p>
+<p>Final ownership counters and late framework allocation counters were zero. Rejection and timeout counters were also zero.</p>
+<p>The one-core, depth-128 Zig samples ranged from 6.89 to 8.71 million responses per second. That variation remains part of the evidence.</p>
+<p class="note">Environment: omarx1, Intel Core Ultra 7 258V, x86_64 Omarchy 4.0.2, kernel 7.1.9-arch1-2, glibc 2.44. Zig used 0.16.0 ReleaseSafe with assertions.</p>
+<p class="note">Recorded power-profile and energy-preference endpoints were performance. Those observations do not establish host isolation or average CPU frequency.</p>
+<p class="note">Low aggregate CPU use does not identify the bottleneck. The remaining gap requires profiling or controlled changes. Corrected wrk percentiles cannot establish request-tail guarantees.</p>
+<p class="note">Source: <a href="../reports/2026-09-05-arena-adoption.md">the qualified adoption report</a>. These results are not a TechEmpower ranking.</p>
+</section>
+<section class="section" id="embedding">
+<p class="eyebrow">07 / Use the framework</p><h2>Keep application policy<br>at the entry point.</h2>
+<p>The <a href="../examples/embedding/src/main.zig">embedding example</a> is a separate consuming project. Its build imports the package module named <code>bounded_http</code>.</p>
+<ol class="steps">
+<li><strong>Select the exact compiler.</strong><p>Use Zig 0.16.0. Use ReleaseSafe for measurements. The project rejects modes that disable its required assertions.</p></li>
+<li><strong>Declare the dependency.</strong><p>The example uses a local package path. Change that path when moving the example into another project.</p></li>
+<li><strong>Establish limits and application state.</strong><p>Select connection, input, output, time and memory ceilings. Keep shared state alive until the cluster has stopped.</p></li>
+<li><strong>Provide the callback.</strong><p>Use <code>api.Handler</code>. A typed helper can return errors. The callback bridge converts unrecoverable handler errors into <code>.close</code>.</p></li>
+<li><strong>Prepare, seal, then run.</strong><p>Initialize <code>Budget</code> and <code>Cluster</code>. Prepare threads, seal the allocator and enter <code>Cluster.run()</code>.</p></li>
+<li><strong>Preserve failure ownership.</strong><p>Collect statistics after a successful run. Do not unwind borrowed storage after an uncertain failure.</p></li>
+</ol>
+<pre><code>cd examples/embedding
+zig build run -Doptimize=ReleaseSafe -- --port 8081 --duration-ms 30000</code></pre>
+<p class="note">From another terminal:</p><pre><code>curl --http1.1 http://127.0.0.1:8081/</code></pre>
+<p>The example stops after its configured duration. The full demo separately shows signal handling and several response routes.</p>
+<p>Read the <a href="USING.md">integration guide</a> for writer lifetimes, output capacity, HEAD behavior and shutdown requirements.</p>
+</section>
+<section class="section" id="limits">
+<p class="eyebrow">08 / Failure and scope</p><h2>Reliability needs<br>honest boundaries.</h2>
+<div class="table-wrap"><table><thead><tr><th>Condition</th><th>Current behavior</th></tr></thead><tbody>
+<tr><td>Admission ceiling reached</td><td>The owner closes the excess accepted socket. The framework does not promise an HTTP 503 response.</td></tr>
+<tr><td>Request exceeds a configured bound</td><td>The parser rejects the request. Body, wire, header and header-count bounds remain separate.</td></tr>
+<tr><td>Peer closes its sending direction</td><td>Complete buffered requests and output can still drain. An incomplete suffix receives an ordered 400 response.</td></tr>
+<tr><td>Cancellation requested</td><td>The owner retains memory through target completion and cancellation acknowledgement.</td></tr>
+<tr><td>Startup partly fails</td><td>The cluster aborts prepared owners before request I/O begins.</td></tr>
+<tr><td>A secondary shard fails</td><td>The cluster asks all shards to stop. A finite watchdog bounds exit acknowledgement.</td></tr>
+<tr><td>Ownership remains uncertain</td><td>The process terminates instead of freeing storage with outstanding borrows.</td></tr>
+<tr><td>An inline callback never returns</td><td>The framework cannot preempt that callback. An external watchdog must supervise a violating application.</td></tr>
+</tbody></table></div>
+<p>The current server binds IPv4 loopback and serves plain HTTP. Transport Layer Security (TLS), Windows HTTP and production deployment qualification remain pending.</p>
+<p>Dynamic borrow-release notifications and per-request worker offload remain pending. Applications cannot safely invent those ownership mechanisms around the current API.</p>
+<p>Future measurements include HTML workloads, macOS contenders, external network traffic and trustworthy response-tail statistics.</p>
+<p class="note">Current native evidence covers macOS and Linux. A cross-compiled binary does not establish runtime behavior on another platform.</p>
+</section>
+<section class="section" id="references">
+<p class="eyebrow">09 / Sources and further reading</p><h2>Read the implementation.<br>Reproduce the evidence.</h2>
+<p>This paper describes runtime source at <code>4b3cd5551d80b422ec6ef763627d019e6f1dfb83</code>. The measured candidate was <code>bbcec8aa9516efc470238b9edeea4f01b1f4a6d7</code>.</p>
+<p>The publication preserves the candidate’s runtime source. The documentation example adds no performance claim.</p>
+<ol class="refs">
+<li><a href="ARCHITECTURE.md">Architecture guide</a> · concepts, startup order, scheduling, resources and shutdown.</li>
+<li><a href="USING.md">Integration guide</a> · dependency setup, callbacks, response writing and operational checks.</li>
+<li><a href="../src/main.zig">Demo entry point</a>, <a href="../src/server.zig">cluster and server</a>, <a href="../src/api.zig">application API</a>, <a href="OWNERSHIP.md">ownership contract</a>.</li>
+<li><a href="https://github.com/technologylab-ai/zig-http/tree/4b3cd5551d80b422ec6ef763627d019e6f1dfb83">Immutable runtime publication</a> · Zig 0.16.0, custom io_uring and kqueue backends.</li>
+<li><a href="../reports/2026-09-05-arena-adoption.md">Qualified comparison</a> and <a href="../reports/2026-09-05-arena-adoption/packet.json">evidence manifest</a> · exact versions, binary hashes, sample ranges and host conditions.</li>
+<li><a href="../reports/2026-09-05-arena-adoption/summarize.py">Read-only evidence verifier</a> · checks raw results without starting a server.</li>
+<li><a href="https://github.com/technologylab-ai/zigllmwiki/blob/main/wiki/tigerstyle.md">TigerStyle synthesis</a> · source-driven guidance for resource bounds, assertions and ownership.</li>
+<li><a href="https://github.com/technologylab-ai/zigllmwiki/blob/main/docs/technical-writing.md">Repository writing policy</a> · the user’s Simplified Technical English and Zinsser guidance.</li>
+</ol>
+</section>
+<footer class="end"><div>BOUNDED / HTTP<br>Architecture and performance · Paper 01</div><div>Offline document · Embedded SVG graphics<br>Experimental software · Exact Zig 0.16.0</div></footer>
+</main>
+<script>
+(function(){
+ document.documentElement.classList.add('has-js');
+ const buttons=[...document.querySelectorAll('[data-cpu]')];
+ const panels=[...document.querySelectorAll('[data-panel]')];
+ function select(cpu){buttons.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.cpu===cpu)));panels.forEach(p=>p.hidden=p.dataset.panel!==cpu);}
+ buttons.forEach(b=>b.addEventListener('click',()=>select(b.dataset.cpu)));select('3');
+ document.querySelector('#print').addEventListener('click',()=>window.print());
+ const links=[...document.querySelectorAll('.rail nav a')];
+ if('IntersectionObserver' in window){const observer=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting)links.forEach(a=>a.setAttribute('aria-current',String(a.hash==='#'+e.target.id)));});},{rootMargin:'-8% 0px -65% 0px'});document.querySelectorAll('section[id]').forEach(s=>observer.observe(s));}
+})();
+</script>
+</body>
+</html>

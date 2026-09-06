@@ -1,0 +1,96 @@
+{
+  "artifacts_sha256": {
+    "browser-checks.json": "0dd711980e8386f3c1aafc68b1237e6492dd52f5fc609ed4f784ff634bd7f3cf",
+    "linux-compiler.json": "f1820ce98d3e9ec0ce793b8fbb5a97410e79b879288b3bf25a246c443255dca4",
+    "linux-development-summary.json": "5dc38cebc81c7ec2cb017c37148142ffa5893759c4501bf3d6c4c7a0f3733732",
+    "linux-development.log": "05a2cf4a820db0f8d1b4294aa8b52975452bda40f790ebb7c918f3509c06ef92",
+    "linux-docs-recheck.json": "76be2c0727bfd36eddbe77bc6c0e341f6e9c5b480fbb5daf9003ba310aa236c4",
+    "linux-docs-recheck.log": "5263cb8feebd4ba4e58b890eaec24749125bbb89f5d8b398ea4795b29aaf6fd5",
+    "macos-debug.log": "4bcfe5bd83df1f9363fcc9bff7b06a035acbbaf2054d352e4b064ae5dc895999",
+    "macos-release-safe.log": "f9a3a3d57074f481642843b899cc7e0af19980d4f880660a5c061cb7464b3edd",
+    "standalone-link-recheck.log": "29f916a8f89cf3ec33e98719e2d9e2577dba8cc505ee5da48eb44af9c5da186c"
+  },
+  "browser": {
+    "both_charts_in_print": true,
+    "both_charts_without_javascript": true,
+    "charts_switch": true,
+    "external_document_resources": 0,
+    "implementation": "Google Chrome headless, isolated temporary profile",
+    "uncaught_exceptions": 0,
+    "viewports": [
+      [
+        1440,
+        1000
+      ],
+      [
+        390,
+        844
+      ]
+    ]
+  },
+  "compiler": "0.16.0",
+  "date": "2026-09-06",
+  "development_tree": true,
+  "linux": {
+    "comparator_tests": 8,
+    "compiler": {
+      "captured_utc": "2026-09-06T11:52:49.196499+00:00",
+      "compiler_path": "/home/rs/.local/share/mise/installs/zig/0.16.0/bin/zig",
+      "compiler_sha256": "2317bbb91798556d9d0f38aabdac23db83f0979b25f767259ae474546724087c",
+      "compiler_version": "0.16.0",
+      "correction": "The earlier environment record resolved the zig shim to mise; this record identifies the selected compiler.",
+      "selection": "/home/rs/.local/share/mise/installs/zig/0.16.0/bin/zig"
+    },
+    "environment": "omarx1, Omarchy 4.0.2, x86_64, kernel 7.1.9-arch1-2, glibc 2.44, io_uring_disabled=0",
+    "initial_docs_check": "failed: sibling-only runbook link",
+    "smoke_exact_responses": 30000,
+    "source_archive_sha256": "7c92518f513ce690e305147c0b5ebbc4b5f0beb3886411f53094a056167408cd",
+    "standalone_link_recheck": "passed on Mac and Linux after repository URL fix",
+    "steps_per_mode": 16,
+    "tests_passed_per_mode": 69,
+    "verify_modes": [
+      "Debug",
+      "ReleaseSafe"
+    ],
+    "wire_cases": 84
+  },
+  "macos": {
+    "architecture": "arm64",
+    "build": "25G83",
+    "example_exact_responses_per_mode": 3,
+    "hardware": "Apple M3 Max",
+    "kernel": "Darwin 25.6.0",
+    "steps_per_mode": 16,
+    "tests_passed_per_mode": 67,
+    "tests_skipped_per_mode": 2,
+    "verify_modes": [
+      "Debug",
+      "ReleaseSafe"
+    ],
+    "version": "26.6.2"
+  },
+  "plotting": {
+    "matplotlib": "3.9.4",
+    "numpy": "2.5.2",
+    "python": "3.12.3",
+    "source_packet": "reports/2026-09-05-arena-adoption/packet.json"
+  },
+  "schema_version": 1,
+  "source_base": "4b3cd5551d80b422ec6ef763627d019e6f1dfb83",
+  "source_sha256": {
+    "build.zig": "50e1fe7e40399be50ae368ccc2c3cc20d1e893742466d3766826a2a8d0f6514e",
+    "build.zig.zon": "8ac5219cecc6e7a01264a83c0927b44e22b961ea643dfb8ed2b9e302835a7077",
+    "examples/embedding/build.zig": "aa12b9b5535a67e3acdde559a0c2dc8028730cb98ca6fadce5dc34364770348d",
+    "examples/embedding/build.zig.zon": "01bb44ae58ca51e1f045227e2e47b40af17cabc84b3b7d10e2c3935f5adb8bde",
+    "examples/embedding/src/main.zig": "213b6f0d3363e9e67b307e79016570b838f41cc8a0b3c8c3c1aa9cc41a284cff",
+    "src/api.zig": "df1dad67eeb5969a59eed57a06c7ff0ac7b5ccae313bc688e0f8015eed8ab4e3",
+    "src/budget.zig": "1a1f2dc2ac3418289590ed8868e588df6039e9fe69ff52412bec368ebfb4dcc9",
+    "src/http.zig": "9f54c8bc607da60294ac042ec90f93642e67f5acbef7b5e1dceebba6e41f6a4f",
+    "src/main.zig": "2fa95737fb4424f5ea5ead9eccbd34125a4eb58b3aa7d3ca41ffb61b45690a12",
+    "src/server.zig": "9644b0b2bf167ff6edc43ccf0968a41d521e5813b4faac4cecefde99675a8bf4",
+    "src/transport.zig": "324245cbdbe8810591985807b4d737d21fa48699695374ace1c8fe800287d8a2",
+    "src/transport_linux.zig": "5dfe71c3cb3fd3fd275dae1c729e5cfc175ce4b6ee4f8d5f3ec6ec8bee1ce2c9",
+    "src/transport_macos.zig": "2a1b2ad432a143079c0cfc7bf860e50fb2cbb0f56dd9a4ac571bb7512b45578a",
+    "tools/check_embedding.py": "9432f055efc8e7c54d10b23c6915e16ea7a7350b87d46174c8dc63a1432137a5"
+  }
+}

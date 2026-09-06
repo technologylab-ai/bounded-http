@@ -1,0 +1,271 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:ns2="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" viewBox="0 0 720 345.6" version="1.1" class="chart-svg" role="img" aria-labelledby="performance-1cpu-title performance-1cpu-desc">
+ <metadata>
+  <rdf:RDF>
+   <ns2:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <ns2:Agent>
+      <dc:title>tools/render_performance_figures.py</dc:title>
+     </ns2:Agent>
+    </dc:creator>
+   </ns2:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="performance-1cpu-figure_1">
+  <g id="performance-1cpu-patch_1">
+   <path d="M 0 345.6  L 720 345.6  L 720 0  L 0 0  z " style="fill: #fffef9" />
+  </g>
+  <g id="performance-1cpu-axes_1">
+   <g id="performance-1cpu-patch_2">
+    <path d="M 93.6 279.936  L 698.4 279.936  L 698.4 82.944  L 93.6 82.944  z " style="fill: #fffef9" />
+   </g>
+   <g id="performance-1cpu-matplotlib.axis_1">
+    <g id="performance-1cpu-xtick_1">
+     <g id="performance-1cpu-line2d_1">
+      <path d="M 93.6 279.936  L 93.6 82.944  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-1cpu-line2d_2" />
+     <g id="performance-1cpu-text_1">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="93.6" y="296.294281" transform="rotate(-0 93.6 296.294281)">0</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-xtick_2">
+     <g id="performance-1cpu-line2d_3">
+      <path d="M 169.2 279.936  L 169.2 82.944  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-1cpu-line2d_4" />
+     <g id="performance-1cpu-text_2">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="169.2" y="296.294281" transform="rotate(-0 169.2 296.294281)">2</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-xtick_3">
+     <g id="performance-1cpu-line2d_5">
+      <path d="M 244.8 279.936  L 244.8 82.944  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-1cpu-line2d_6" />
+     <g id="performance-1cpu-text_3">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="244.8" y="296.294281" transform="rotate(-0 244.8 296.294281)">4</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-xtick_4">
+     <g id="performance-1cpu-line2d_7">
+      <path d="M 320.4 279.936  L 320.4 82.944  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-1cpu-line2d_8" />
+     <g id="performance-1cpu-text_4">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="320.4" y="296.294281" transform="rotate(-0 320.4 296.294281)">6</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-xtick_5">
+     <g id="performance-1cpu-line2d_9">
+      <path d="M 396 279.936  L 396 82.944  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-1cpu-line2d_10" />
+     <g id="performance-1cpu-text_5">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="396" y="296.294281" transform="rotate(-0 396 296.294281)">8</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-xtick_6">
+     <g id="performance-1cpu-line2d_11">
+      <path d="M 471.6 279.936  L 471.6 82.944  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-1cpu-line2d_12" />
+     <g id="performance-1cpu-text_6">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="471.6" y="296.294281" transform="rotate(-0 471.6 296.294281)">10</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-xtick_7">
+     <g id="performance-1cpu-line2d_13">
+      <path d="M 547.2 279.936  L 547.2 82.944  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-1cpu-line2d_14" />
+     <g id="performance-1cpu-text_7">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="547.2" y="296.294281" transform="rotate(-0 547.2 296.294281)">12</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-xtick_8">
+     <g id="performance-1cpu-line2d_15">
+      <path d="M 622.8 279.936  L 622.8 82.944  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-1cpu-line2d_16" />
+     <g id="performance-1cpu-text_8">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="622.8" y="296.294281" transform="rotate(-0 622.8 296.294281)">14</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-xtick_9">
+     <g id="performance-1cpu-line2d_17">
+      <path d="M 698.4 279.936  L 698.4 82.944  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #d2d7d0; stroke-width: 0.8; stroke-linecap: square" />
+     </g>
+     <g id="performance-1cpu-line2d_18" />
+     <g id="performance-1cpu-text_9">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="698.4" y="296.294281" transform="rotate(-0 698.4 296.294281)">16</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-text_10">
+     <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: middle" x="396" y="316.940219" transform="rotate(-0 396 316.940219)">Completed responses per second (millions)</text>
+    </g>
+   </g>
+   <g id="performance-1cpu-matplotlib.axis_2">
+    <g id="performance-1cpu-ytick_1">
+     <g id="performance-1cpu-line2d_19" />
+     <g id="performance-1cpu-text_11">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: end" x="85.6" y="122.073334" transform="rotate(-0 85.6 122.073334)">Depth 1</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-ytick_2">
+     <g id="performance-1cpu-line2d_20" />
+     <g id="performance-1cpu-text_12">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: end" x="85.6" y="185.619141" transform="rotate(-0 85.6 185.619141)">Depth 16</text>
+     </g>
+    </g>
+    <g id="performance-1cpu-ytick_3">
+     <g id="performance-1cpu-line2d_21" />
+     <g id="performance-1cpu-text_13">
+      <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: end" x="85.6" y="249.164947" transform="rotate(-0 85.6 249.164947)">Depth 128</text>
+     </g>
+    </g>
+   </g>
+   <g id="performance-1cpu-patch_3">
+    <path d="M 93.6 97.241806  L 107.376114 97.241806  L 107.376114 115.67009  L 93.6 115.67009  z " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #d94b2b" />
+   </g>
+   <g id="performance-1cpu-text_14">
+    <text style="fill: #172f40; font: 10px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="113.490762" y="109.215323" transform="rotate(-0 113.490762 109.215323)">0.364 M/s</text>
+   </g>
+   <g id="performance-1cpu-patch_4">
+    <path d="M 93.6 160.787613  L 222.282353 160.787613  L 222.282353 179.215897  L 93.6 179.215897  z " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #d94b2b" />
+   </g>
+   <g id="performance-1cpu-text_15">
+    <text style="fill: #172f40; font: 10px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="228.64588" y="172.76113" transform="rotate(-0 228.64588 172.76113)">3.404 M/s</text>
+   </g>
+   <g id="performance-1cpu-patch_5">
+    <path d="M 93.6 224.333419  L 420.695298 224.333419  L 420.695298 242.761703  L 93.6 242.761703  z " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #d94b2b" />
+   </g>
+   <g id="performance-1cpu-text_16">
+    <text style="fill: #172f40; font: 10px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="428.783104" y="236.306936" transform="rotate(-0 428.783104 236.306936)">8.653 M/s</text>
+   </g>
+   <g id="performance-1cpu-patch_6">
+    <path d="M 93.6 120.118297  L 106.055492 120.118297  L 106.055492 138.546581  L 93.6 138.546581  z " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40" />
+   </g>
+   <g id="performance-1cpu-text_17">
+    <text style="fill: #172f40; font: 10px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="112.152702" y="132.091814" transform="rotate(-0 112.152702 132.091814)">0.330 M/s</text>
+   </g>
+   <g id="performance-1cpu-patch_7">
+    <path d="M 93.6 183.664103  L 258.940881 183.664103  L 258.940881 202.092387  L 93.6 202.092387  z " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40" />
+   </g>
+   <g id="performance-1cpu-text_18">
+    <text style="fill: #172f40; font: 10px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="267.946885" y="195.63762" transform="rotate(-0 267.946885 195.63762)">4.374 M/s</text>
+   </g>
+   <g id="performance-1cpu-patch_8">
+    <path d="M 93.6 247.20991  L 642.367928 247.20991  L 642.367928 265.638194  L 93.6 265.638194  z " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40" />
+   </g>
+   <g id="performance-1cpu-text_19">
+    <text style="fill: #172f40; font: 10px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="651.607635" y="259.183427" transform="rotate(-0 651.607635 259.183427)">14.518 M/s</text>
+   </g>
+   <g id="performance-1cpu-LineCollection_1">
+    <path d="M 107.299588 106.455948  L 107.442762 106.455948  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 107.299588 106.455948  L 107.442762 106.455948  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #172f40; stroke-width: 1.2" />
+   </g>
+   <g id="performance-1cpu-line2d_22">
+    <path d="M 107.299588 110.455948  L 107.299588 102.455948  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 107.299588 110.455948  L 107.299588 102.455948  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-line2d_23">
+    <path d="M 107.442762 110.455948  L 107.442762 102.455948  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 107.442762 110.455948  L 107.442762 102.455948  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-LineCollection_2">
+    <path d="M 220.641039 170.001755  L 222.59788 170.001755  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 220.641039 170.001755  L 222.59788 170.001755  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #172f40; stroke-width: 1.2" />
+   </g>
+   <g id="performance-1cpu-line2d_24">
+    <path d="M 220.641039 174.001755  L 220.641039 166.001755  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 220.641039 174.001755  L 220.641039 166.001755  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-line2d_25">
+    <path d="M 222.59788 174.001755  L 222.59788 166.001755  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 222.59788 174.001755  L 222.59788 166.001755  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-LineCollection_3">
+    <path d="M 353.934965 233.547561  L 422.735104 233.547561  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 353.934965 233.547561  L 422.735104 233.547561  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #172f40; stroke-width: 1.2" />
+   </g>
+   <g id="performance-1cpu-line2d_26">
+    <path d="M 353.934965 237.547561  L 353.934965 229.547561  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 353.934965 237.547561  L 353.934965 229.547561  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-line2d_27">
+    <path d="M 422.735104 237.547561  L 422.735104 229.547561  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 422.735104 237.547561  L 422.735104 229.547561  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-LineCollection_4">
+    <path d="M 106.049431 129.332439  L 106.104702 129.332439  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 106.049431 129.332439  L 106.104702 129.332439  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #172f40; stroke-width: 1.2" />
+   </g>
+   <g id="performance-1cpu-line2d_28">
+    <path d="M 106.049431 133.332439  L 106.049431 125.332439  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 106.049431 133.332439  L 106.049431 125.332439  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-line2d_29">
+    <path d="M 106.104702 133.332439  L 106.104702 125.332439  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 106.104702 133.332439  L 106.104702 125.332439  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-LineCollection_5">
+    <path d="M 255.410561 192.878245  L 261.898885 192.878245  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 255.410561 192.878245  L 261.898885 192.878245  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #172f40; stroke-width: 1.2" />
+   </g>
+   <g id="performance-1cpu-line2d_30">
+    <path d="M 255.410561 196.878245  L 255.410561 188.878245  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 255.410561 196.878245  L 255.410561 188.878245  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-line2d_31">
+    <path d="M 261.898885 196.878245  L 261.898885 188.878245  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 261.898885 196.878245  L 261.898885 188.878245  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-LineCollection_6">
+    <path d="M 638.586532 256.424052  L 645.559635 256.424052  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 638.586532 256.424052  L 645.559635 256.424052  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: none; stroke: #172f40; stroke-width: 1.2" />
+   </g>
+   <g id="performance-1cpu-line2d_32">
+    <path d="M 638.586532 260.424052  L 638.586532 252.424052  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 638.586532 260.424052  L 638.586532 252.424052  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-line2d_33">
+    <path d="M 645.559635 260.424052  L 645.559635 252.424052  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #fffef9; stroke-width: 3.5" />
+    <path d="M 645.559635 260.424052  L 645.559635 252.424052  " clip-path="url(#performance-1cpu-p04a84bdc63)" style="fill: #172f40; stroke: #172f40" />
+   </g>
+   <g id="performance-1cpu-legend_1">
+    <g id="performance-1cpu-patch_9">
+     <path d="M 503.187812 68.786424  L 525.187812 68.786424  L 525.187812 61.086424  L 503.187812 61.086424  z " style="fill: #d94b2b" />
+    </g>
+    <g id="performance-1cpu-text_20">
+     <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="533.987812" y="68.786424" transform="rotate(-0 533.987812 68.786424)">Zig HTTP</text>
+    </g>
+    <g id="performance-1cpu-patch_10">
+     <path d="M 605.207656 68.786424  L 627.207656 68.786424  L 627.207656 61.086424  L 605.207656 61.086424  z " style="fill: #172f40" />
+    </g>
+    <g id="performance-1cpu-text_21">
+     <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="636.007656" y="68.786424" transform="rotate(-0 636.007656 68.786424)">libreactor</text>
+    </g>
+   </g>
+  </g>
+  <g id="performance-1cpu-text_22">
+   <text style="fill: #172f40; font: 700 19px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="93.6" y="22.464" transform="rotate(-0 93.6 22.464)">One allowed server CPU</text>
+  </g>
+  <g id="performance-1cpu-text_23">
+   <text style="fill: #172f40; font: 11px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="93.6" y="44.928" transform="rotate(-0 93.6 44.928)">128 connections · 3 trials · 5 seconds each</text>
+  </g>
+  <g id="performance-1cpu-text_24">
+   <text style="fill: #172f40; font: 9px 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; text-anchor: start" x="93.6" y="330.048" transform="rotate(-0 93.6 330.048)">Bars: medians · Whiskers: observed min–max · Closed-loop HTTP/1.1</text>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="performance-1cpu-p04a84bdc63">
+   <rect x="93.6" y="82.944" width="604.8" height="196.992" />
+  </clipPath>
+ </defs>
+<title id="performance-1cpu-title">One allowed server CPU</title><desc id="performance-1cpu-desc">Depth 1: zig-http median 0.364447 million responses/s; range 0.362423 to 0.366211. Depth 16: zig-http median 3.404295 million responses/s; range 3.360874 to 3.412642. Depth 128: zig-http median 8.653315 million responses/s; range 6.887168 to 8.707278. Depth 1: libreactor median 0.329510 million responses/s; range 0.329350 to 0.330812. Depth 16: libreactor median 4.374097 million responses/s; range 4.280703 to 4.452351. Depth 128: libreactor median 14.517670 million responses/s; range 14.417633 to 14.602107.</desc></svg>

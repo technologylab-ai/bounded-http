@@ -1,0 +1,41 @@
+{
+  "desktop": {
+    "width": 1440,
+    "scrollWidth": 1440,
+    "svgs": 6,
+    "panels": [
+      {
+        "cpu": "3",
+        "hidden": false
+      },
+      {
+        "cpu": "1",
+        "hidden": true
+      }
+    ],
+    "external": []
+  },
+  "toggle": [
+    {
+      "cpu": "3",
+      "hidden": true
+    },
+    {
+      "cpu": "1",
+      "hidden": false
+    }
+  ],
+  "mobile": {
+    "width": 390,
+    "scrollWidth": 390
+  },
+  "print": [
+    "block",
+    "block"
+  ],
+  "noScript": [
+    "block",
+    "block"
+  ],
+  "exceptions": []
+}

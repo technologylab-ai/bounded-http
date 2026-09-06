@@ -1,0 +1,4 @@
+RESERVED {"agent": "/root/batch_quantum", "purpose": "Standalone development documentation recheck; no native workload", "host": "omarx1", "pid": 1537255, "start_ticks": "53960030", "token": "9444c582ae0d453a87e6d6e1f7453c69", "started_utc": "2026-09-06T11:54:27.334825+00:00"}
+Documentation links, 6 accessible SVGs, unique IDs, and offline generation pass.
+DOCS_EXIT 0
+RELEASED {"token": "9444c582ae0d453a87e6d6e1f7453c69", "released_utc": "2026-09-06T11:54:27.457092+00:00"}

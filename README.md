@@ -1,5 +1,11 @@
 # Bounded Zig HTTP
 
+Start with the [architecture guide](docs/ARCHITECTURE.md) to understand clusters, ownership, startup, and request processing.
+The [integration guide](docs/USING.md) explains dependency setup, callbacks, resource limits, and response writing.
+The [illustrated whitepaper](docs/whitepaper.html) presents the design and qualified performance results.
+Open the HTML file in a browser; the document includes every SVG and works offline.
+The [independent embedding example](examples/embedding/src/main.zig) demonstrates the complete application lifecycle.
+
 An experimental HTTP/1.1 framework and reference server for **Zig 0.16.0**.
 Linux uses a custom single-shot `io_uring` adapter; macOS uses nonblocking
 sockets with `kqueue`. Application callbacks can run on the I/O owner or on fixed startup workers.

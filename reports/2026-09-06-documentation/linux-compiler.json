@@ -1,0 +1,8 @@
+{
+  "correction": "The earlier environment record resolved the zig shim to mise; this record identifies the selected compiler.",
+  "compiler_path": "/home/rs/.local/share/mise/installs/zig/0.16.0/bin/zig",
+  "compiler_sha256": "2317bbb91798556d9d0f38aabdac23db83f0979b25f767259ae474546724087c",
+  "compiler_version": "0.16.0",
+  "selection": "/home/rs/.local/share/mise/installs/zig/0.16.0/bin/zig",
+  "captured_utc": "2026-09-06T11:52:49.196499+00:00"
+}

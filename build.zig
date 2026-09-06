@@ -35,10 +35,17 @@ pub fn build(b: *std.Build) void {
     b.step("run", "Run the bounded HTTP experiment").dependOn(&run.step);
     const verify = b.step("verify", "Compile and test the exact-version MVP");
     verify.dependOn(&exe.step);
-    const format = b.addFmt(.{ .paths = &.{ "build.zig", "build.zig.zon", "src" }, .check = true });
+    const format = b.addFmt(.{ .paths = &.{ "build.zig", "build.zig.zon", "src", "examples" }, .check = true });
     verify.dependOn(&format.step);
     const version = b.addSystemCommand(&.{ "python3", "tools/check_version.py" });
     verify.dependOn(&version.step);
+    const embedding_prefix = b.pathFromRoot(b.fmt(".zig-cache/embedding-{s}", .{@tagName(optimize)}));
+    const embedding_build = b.addSystemCommand(&.{ b.graph.zig_exe, "build", b.fmt("-Doptimize={s}", .{@tagName(optimize)}), "--prefix", embedding_prefix });
+    embedding_build.setCwd(b.path("examples/embedding"));
+    const embedding_check = b.addSystemCommand(&.{ "python3", "tools/check_embedding.py", "--binary", b.pathJoin(&.{ embedding_prefix, "bin", "embedded-http" }) });
+    embedding_check.step.dependOn(&embedding_build.step);
+    b.step("example-check", "Compile and exercise the independent embedding project").dependOn(&embedding_check.step);
+    verify.dependOn(&embedding_check.step);
     const test_step = b.step("test", "Run unit and transport tests");
     for ([_][]const u8{ "src/http.zig", "src/api.zig", "src/budget.zig", "src/transport.zig", "src/server.zig" }) |path| {
         const tests = b.addTest(.{ .use_llvm = if (target.result.os.tag == .linux and optimize == .Debug) true else null, .use_lld = if (target.result.os.tag == .linux and optimize == .Debug) true else null, .root_module = b.createModule(.{

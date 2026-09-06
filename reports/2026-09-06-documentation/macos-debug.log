@@ -1,0 +1,19 @@
+{"binary_sha256": "0f79463ca907a98a4966f21dbe4764db4ed9b48a12c527fec0a518305a00d57f", "command": ["/Users/rs/code/github.com/technologylab.ai/zig-http-docs/.zig-cache/embedding-Debug/bin/embedded-http", "--port", "0", "--duration-ms", "1500"], "elapsed_seconds": 1.5788823330000001, "exact_responses": 3, "methods": ["GET", "HEAD", "GET"], "ok": true, "platform": "macOS-26.6.2-arm64-arm-64bit", "server_log": "READY port=52432\nSTATS {\"execution\":\"inline_event_loop\",\"gather_send\":true,\"response_batch_limit\":128,\"callbacks_per_turn\":2048,\"shards\":1,\"response_batches\":1,\"batched_finished_responses\":3,\"max_batch_responses\":3,\"scalar_send_operations\":0,\"gather_send_operations\":1,\"single_span_send_operations\":1,\"borrow_copies\":3,\"send_completions\":1,\"short_send_completions\":0,\"gather_cancel_requests\":0,\"gather_canceled_completions\":0,\"max_canceled_batch_responses\":0,\"max_send_parts\":1,\"max_send_bytes\":405,\"max_inline_callbacks_per_turn\":3,\"inline_dispatches\":3,\"worker_dispatches\":0,\"accepted\":1,\"completed\":3,\"rejected\":0,\"timeouts\":0,\"flushes\":0,\"resumed\":0,\"bytes_received\":146,\"bytes_sent\":405,\"pipeline_copy_bytes\":0,\"live_connections\":0,\"peak_connections\":1,\"live_operations\":0,\"peak_operations\":2,\"max_loop_ns\":59000,\"turns\":134,\"idle_polls\":130,\"prearmed_receives\":0,\"max_handler_ns\":0,\"max_queue_ns\":0,\"max_request_ns\":80000,\"workers\":0,\"allocation_calls_after_start\":0,\"framework_heap_peak_bytes\":3709026,\"framework_heap_limit_bytes\":16777216}\n", "stats": {"accepted": 1, "allocation_calls_after_start": 0, "batched_finished_responses": 3, "borrow_copies": 3, "bytes_received": 146, "bytes_sent": 405, "callbacks_per_turn": 2048, "completed": 3, "execution": "inline_event_loop", "flushes": 0, "framework_heap_limit_bytes": 16777216, "framework_heap_peak_bytes": 3709026, "gather_cancel_requests": 0, "gather_canceled_completions": 0, "gather_send": true, "gather_send_operations": 1, "idle_polls": 130, "inline_dispatches": 3, "live_connections": 0, "live_operations": 0, "max_batch_responses": 3, "max_canceled_batch_responses": 0, "max_handler_ns": 0, "max_inline_callbacks_per_turn": 3, "max_loop_ns": 59000, "max_queue_ns": 0, "max_request_ns": 80000, "max_send_bytes": 405, "max_send_parts": 1, "peak_connections": 1, "peak_operations": 2, "pipeline_copy_bytes": 0, "prearmed_receives": 0, "rejected": 0, "response_batch_limit": 128, "response_batches": 1, "resumed": 0, "scalar_send_operations": 0, "send_completions": 1, "shards": 1, "short_send_completions": 0, "single_span_send_operations": 1, "timeouts": 0, "turns": 134, "worker_dispatches": 0, "workers": 0}}
+Build Summary: 16/16 steps succeeded; 67/69 tests passed (2 skipped)
+verify success
++- compile exe zig-http Debug native cached 88ms MaxRSS:31M
++- zig fmt --check success
++- run python3 success 93ms
++- run python3 success 1s
+|  +- run /Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/zig success 166ms
++- run test 15 pass (15 total) 38ms MaxRSS:2M
+|  +- compile test Debug native cached 94ms MaxRSS:31M
++- run test 4 pass (4 total) 17ms MaxRSS:2M
+|  +- compile test Debug native cached 90ms MaxRSS:31M
++- run test 1 pass (1 total) 11ms MaxRSS:2M
+|  +- compile test Debug native cached 95ms MaxRSS:31M
++- run test 7 pass (7 total) 38ms MaxRSS:2M
+|  +- compile test Debug native cached 88ms MaxRSS:31M
++- run test 40 pass, 2 skip (42 total) 95ms MaxRSS:3M
+   +- compile test Debug native cached 96ms MaxRSS:31M
+

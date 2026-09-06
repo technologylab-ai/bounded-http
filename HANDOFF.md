@@ -1,3 +1,41 @@
+# HTTP documentation handoff — 2026-09-06
+
+The architecture documentation is maintained on `docs/server-architecture` in the sibling `zig-http-docs` worktree.
+The delivery extends the arena/shard implementation already adopted into main.
+Runtime source under `src/` remains identical to publication `4b3cd5551d80b422ec6ef763627d019e6f1dfb83`.
+Preserve all earlier reference branches and worktrees.
+
+Start with [the architecture guide](docs/ARCHITECTURE.md), [integration guide](docs/USING.md), and [offline whitepaper](docs/whitepaper.html).
+The whitepaper embeds six accessible SVGs and supports desktop, mobile, print, and reading without JavaScript.
+The [independent embedding example](examples/embedding/src/main.zig) demonstrates dependency setup and the complete bounded lifecycle.
+The root verifier compiles that consumer and checks its finite GET/HEAD/GET pipeline.
+
+Edit `docs/whitepaper.template.html` and canonical SVGs under `docs/diagrams/`.
+Run `python3 tools/render_whitepaper.py`, then `python3 tools/check_docs.py`.
+The [documentation maintenance page](docs/README.md) pins plotting dependencies and explains regeneration.
+The wiki now preserves the user's Simplified Technical English and Zinsser writing policy.
+
+[Documentation validation](reports/2026-09-06-documentation.md) records source hashes, environments, and development checks.
+Mac Debug and ReleaseSafe each passed 16 build steps, 67 tests, and the independent consumer probe.
+Two Linux-only tests were skipped per Mac mode.
+The browser review passed offline loading, chart selection, print visibility, and mobile overflow checks.
+Linux Debug and ReleaseSafe each passed 16 build steps, 69 tests, and the independent consumer probe.
+Linux also passed 84 wire cases, eight comparator tests, and 30,000 exact smoke responses.
+A standalone checkout passed document checks after correcting a sibling-only runbook link.
+No new benchmark measurements accompany this delivery.
+
+Continue with the unfinished [roadmap items](ROADMAP.md).
+Priorities include profiling one-core efficiency, dynamic lease release, optional offload, and broader reliability qualification.
+HTML, macOS contender, external-network, and qualified response-tail comparisons remain queued.
+Windows HTTP remains unimplemented; Windows tuning stays deferred, and wiki M3-006 remains postponed.
+This documentation delivery does not complete M4.
+
+Acquire `/tmp/zig-http-measurement.lock` before heavy builds, runtime suites, or browser rendering on either host.
+Use the sibling wiki's `docs/platform-testing.md` for reservation metadata and remote-run commands.
+A queued roadmap item does not identify an active agent or runner.
+
+## Historical handoff: arena/shard adoption
+
 # HTTP experiment handoff — 2026-09-05
 
 Arena/shard adoption is the current base on `integrate/arena-shards` in
