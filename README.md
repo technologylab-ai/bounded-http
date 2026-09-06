@@ -117,8 +117,9 @@ means the local socket accepted the bytes; it does not prove peer receipt.
 `return writer.finish()` sends the remaining bytes and completes HTTP framing,
 without another application callback. No later writes belong to that response.
 
-`borrow` and `begin`'s `content_type` currently require request-owned input or
-immutable server-lifetime storage. There is no dynamic lease-release callback
+`borrow` requires request-owned input or immutable server-lifetime storage.
+`begin` copies its `content_type` argument during the call.
+There is no dynamic lease-release callback
 on finish/cancellation. Stack locals and externally recycled buffers must not
 escape a callback this way. If `reserve` returns `WouldBlock`, flush the existing
 committed bytes and continue from `context.state` on resume; a reservation larger

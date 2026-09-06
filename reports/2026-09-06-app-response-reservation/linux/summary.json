@@ -1,0 +1,732 @@
+{
+  "commands": [
+    {
+      "cleanup": {
+        "initial_workspace_survivors": [],
+        "remaining_workspace_processes": []
+      },
+      "command": [
+        "zig",
+        "build",
+        "verify",
+        "-Doptimize=Debug",
+        "-j2",
+        "--summary",
+        "all"
+      ],
+      "exit_code": 0,
+      "finished_utc": "2026-09-06T13:43:53.284615+00:00",
+      "leader_pid": 1678274,
+      "observed_processes": [
+        {
+          "command": "/home/rs/.local/share/mise/installs/zig/0.16.0/bin/zig build verify -Doptimize=Debug -j2 --summary all ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+          "pgid": 1678274,
+          "pid": 1678274,
+          "ppid": 1678262,
+          "start_ticks": "54615615"
+        },
+        {
+          "command": ".zig-cache/o/28c52a7b38daa1f14b2805640a58aec2/build /home/rs/.local/share/mise/installs/zig/0.16.0/zig /home/rs/.local/share/mise/installs/zig/0.16.0/lib /tmp/zig-http.seam.f0gylvbx/engine .zig-cache /home/rs/.cache/zig --seed 0xcd8e279f -Z817556b0b455aab7 verify -Doptimize=Debug -j2 --summary all ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/.zig-cache/o/28c52a7b38daa1f14b2805640a58aec2/build",
+          "pgid": 1678274,
+          "pid": 1678285,
+          "ppid": 1678274,
+          "start_ticks": "54615726"
+        },
+        {
+          "command": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig test -fllvm -flld -ODebug -Mroot=/tmp/zig-http.seam.f0gylvbx/engine/src/budget.zig -lc --cache-dir .zig-cache --global-cache-dir /home/rs/.cache/zig --name test --zig-lib-dir /home/rs/.local/share/mise/installs/zig/0.16.0/lib/ --listen=- ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+          "pgid": 1678274,
+          "pid": 1678288,
+          "ppid": 1678285,
+          "start_ticks": "54615728"
+        },
+        {
+          "command": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig test -fllvm -flld -ODebug -Mroot=/tmp/zig-http.seam.f0gylvbx/engine/src/http.zig -lc --cache-dir .zig-cache --global-cache-dir /home/rs/.cache/zig --name test --zig-lib-dir /home/rs/.local/share/mise/installs/zig/0.16.0/lib/ --listen=- ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+          "pgid": 1678274,
+          "pid": 1678289,
+          "ppid": 1678285,
+          "start_ticks": "54615728"
+        },
+        {
+          "command": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig build-exe -fllvm -flld -ODebug --dep bounded_http -Mroot=/tmp/zig-http.seam.f0gylvbx/engine/src/main.zig -ODebug -Mbounded_http=/tmp/zig-http.seam.f0gylvbx/engine/src/server.zig -lc --cache-dir .zig-cache --global-cache-dir /home/rs/.cache/zig --name zig-http --zig-lib-dir /home/rs/.local/share/mise/installs/zig/0.16.0/lib/ --listen=- ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+          "pgid": 1678274,
+          "pid": 1678290,
+          "ppid": 1678285,
+          "start_ticks": "54615728"
+        },
+        {
+          "command": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig test -fllvm -flld -ODebug -Mroot=/tmp/zig-http.seam.f0gylvbx/engine/src/server.zig -lc --cache-dir .zig-cache --global-cache-dir /home/rs/.cache/zig --name test --zig-lib-dir /home/rs/.local/share/mise/installs/zig/0.16.0/lib/ --listen=- ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+          "pgid": 1678274,
+          "pid": 1678419,
+          "ppid": 1678285,
+          "start_ticks": "54615954"
+        },
+        {
+          "command": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig test -fllvm -flld -ODebug -Mroot=/tmp/zig-http.seam.f0gylvbx/engine/src/transport.zig -lc --cache-dir .zig-cache --global-cache-dir /home/rs/.cache/zig --name test --zig-lib-dir /home/rs/.local/share/mise/installs/zig/0.16.0/lib/ --listen=- ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+          "pgid": 1678274,
+          "pid": 1678431,
+          "ppid": 1678285,
+          "start_ticks": "54615957"
+        },
+        {
+          "command": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig test -fllvm -flld -ODebug -Mroot=/tmp/zig-http.seam.f0gylvbx/engine/src/api.zig -lc --cache-dir .zig-cache --global-cache-dir /home/rs/.cache/zig --name test --zig-lib-dir /home/rs/.local/share/mise/installs/zig/0.16.0/lib/ --listen=- ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+          "pgid": 1678274,
+          "pid": 1678432,
+          "ppid": 1678285,
+          "start_ticks": "54615957"
+        },
+        {
+          "command": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig build -Doptimize=Debug --prefix /tmp/zig-http.seam.f0gylvbx/engine/.zig-cache/embedding-Debug ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine/examples/embedding",
+          "exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+          "pgid": 1678274,
+          "pid": 1678470,
+          "ppid": 1678285,
+          "start_ticks": "54616167"
+        },
+        {
+          "command": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig ld.lld --error-limit=0 -mllvm -float-abi=hard --entry _start -z stack-size=16777216 --build-id=none --image-base=16777216 --eh-frame-hdr -znow -m elf_x86_64 -o .zig-cache/o/8c4448be24286b5b7e404d092f714c9a/test /usr/lib/gcc/x86_64-pc-linux-gnu/16/../../../../lib/crt1.o /usr/lib/gcc/x86_64-pc-linux-gnu/16/../../../../lib/crti.o -L /usr/lib/gcc/x86_64-pc-linux-gnu/16/../../../../lib --dynamic-linker /lib64/ld-linux-x86-64.so.2 .zig-cache/o/8c4448be24286b5b7e404d092f714c9a/test_zcu.o --as-needed -lm -lpthread -lc -ldl -lrt -lutil /home/rs/.cache/zig/o/a939f8bacc52f5711be92b3be91a195e/libcompiler_rt.a /usr/lib/gcc/x86_64-pc-linux-gnu/16/../../../../lib/crtn.o ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+          "pgid": 1678274,
+          "pid": 1678495,
+          "ppid": 1678419,
+          "start_ticks": "54616209"
+        },
+        {
+          "command": ".zig-cache/o/3d3c9ac8850f866fbd79ff0c5522e8bc/build /home/rs/.local/share/mise/installs/zig/0.16.0/zig /home/rs/.local/share/mise/installs/zig/0.16.0/lib /tmp/zig-http.seam.f0gylvbx/engine/examples/embedding .zig-cache /home/rs/.cache/zig --seed 0xde26204a -Z2594a487d91e1fd4 -Doptimize=Debug --prefix /tmp/zig-http.seam.f0gylvbx/engine/.zig-cache/embedding-Debug ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine/examples/embedding",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/examples/embedding/.zig-cache/o/3d3c9ac8850f866fbd79ff0c5522e8bc/build",
+          "pgid": 1678274,
+          "pid": 1678516,
+          "ppid": 1678470,
+          "start_ticks": "54616245"
+        },
+        {
+          "command": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig build-exe -fllvm -flld -ODebug --dep bounded_http -Mroot=/tmp/zig-http.seam.f0gylvbx/engine/examples/embedding/src/main.zig -ODebug -Mbounded_http=/tmp/zig-http.seam.f0gylvbx/engine/src/server.zig -lc --cache-dir .zig-cache --global-cache-dir /home/rs/.cache/zig --name embedded-http --zig-lib-dir /home/rs/.local/share/mise/installs/zig/0.16.0/lib/ --listen=- ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine/examples/embedding",
+          "exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+          "pgid": 1678274,
+          "pid": 1678518,
+          "ppid": 1678516,
+          "start_ticks": "54616247"
+        },
+        {
+          "command": "python3 tools/check_embedding.py --binary /tmp/zig-http.seam.f0gylvbx/engine/.zig-cache/embedding-Debug/bin/embedded-http ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/usr/bin/python3.14",
+          "pgid": 1678274,
+          "pid": 1678548,
+          "ppid": 1678285,
+          "start_ticks": "54616466"
+        },
+        {
+          "command": "/tmp/zig-http.seam.f0gylvbx/engine/.zig-cache/embedding-Debug/bin/embedded-http --port 0 --duration-ms 1500 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/.zig-cache/embedding-Debug/bin/embedded-http",
+          "pgid": 1678549,
+          "pid": 1678549,
+          "ppid": 1678548,
+          "start_ticks": "54616469"
+        }
+      ],
+      "process_group": 1678274,
+      "sequence": 1,
+      "started_utc": "2026-09-06T13:43:43.155945+00:00",
+      "watchdog_seconds": 600
+    },
+    {
+      "cleanup": {
+        "initial_workspace_survivors": [],
+        "remaining_workspace_processes": []
+      },
+      "command": [
+        "zig",
+        "build",
+        "verify",
+        "-Doptimize=ReleaseSafe",
+        "-j2",
+        "--summary",
+        "all"
+      ],
+      "exit_code": 0,
+      "finished_utc": "2026-09-06T13:44:43.799536+00:00",
+      "leader_pid": 1678558,
+      "observed_processes": [
+        {
+          "command": "/home/rs/.local/share/mise/installs/zig/0.16.0/bin/zig build verify -Doptimize=ReleaseSafe -j2 --summary all ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+          "pgid": 1678558,
+          "pid": 1678558,
+          "ppid": 1678262,
+          "start_ticks": "54616628"
+        },
+        {
+          "command": ".zig-cache/o/28c52a7b38daa1f14b2805640a58aec2/build /home/rs/.local/share/mise/installs/zig/0.16.0/zig /home/rs/.local/share/mise/installs/zig/0.16.0/lib /tmp/zig-http.seam.f0gylvbx/engine .zig-cache /home/rs/.cache/zig --seed 0xf8d1f8bb -Z063c60d17b321fea verify -Doptimize=ReleaseSafe -j2 --summary all ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/.zig-cache/o/28c52a7b38daa1f14b2805640a58aec2/build",
+          "pgid": 1678558,
+          "pid": 1678568,
+          "ppid": 1678558,
+          "start_ticks": "54616630"
+        },
+        {
+          "command": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig test -OReleaseSafe -Mroot=/tmp/zig-http.seam.f0gylvbx/engine/src/http.zig -lc --cache-dir .zig-cache --global-cache-dir /home/rs/.cache/zig --name test --zig-lib-dir /home/rs/.local/share/mise/installs/zig/0.16.0/lib/ --listen=- ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+          "pgid": 1678558,
+          "pid": 1678571,
+          "ppid": 1678568,
+          "start_ticks": "54616631"
+        },
+        {
+          "command": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig test -OReleaseSafe -Mroot=/tmp/zig-http.seam.f0gylvbx/engine/src/budget.zig -lc --cache-dir .zig-cache --global-cache-dir /home/rs/.cache/zig --name test --zig-lib-dir /home/rs/.local/share/mise/installs/zig/0.16.0/lib/ --listen=- ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+          "pgid": 1678558,
+          "pid": 1678572,
+          "ppid": 1678568,
+          "start_ticks": "54616631"
+        },
+        {
+          "command": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig test -OReleaseSafe -Mroot=/tmp/zig-http.seam.f0gylvbx/engine/src/transport.zig -lc --cache-dir .zig-cache --global-cache-dir /home/rs/.cache/zig --name test --zig-lib-dir /home/rs/.local/share/mise/installs/zig/0.16.0/lib/ --listen=- ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+          "pgid": 1678558,
+          "pid": 1678688,
+          "ppid": 1678568,
+          "start_ticks": "54617567"
+        },
+        {
+          "command": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig build -Doptimize=ReleaseSafe --prefix /tmp/zig-http.seam.f0gylvbx/engine/.zig-cache/embedding-ReleaseSafe ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine/examples/embedding",
+          "exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+          "pgid": 1678558,
+          "pid": 1678786,
+          "ppid": 1678568,
+          "start_ticks": "54618507"
+        },
+        {
+          "command": ".zig-cache/o/3d3c9ac8850f866fbd79ff0c5522e8bc/build /home/rs/.local/share/mise/installs/zig/0.16.0/zig /home/rs/.local/share/mise/installs/zig/0.16.0/lib /tmp/zig-http.seam.f0gylvbx/engine/examples/embedding .zig-cache /home/rs/.cache/zig --seed 0x4ed3ccbb -Z4002dffe2b1a7d44 -Doptimize=ReleaseSafe --prefix /tmp/zig-http.seam.f0gylvbx/engine/.zig-cache/embedding-ReleaseSafe ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine/examples/embedding",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/examples/embedding/.zig-cache/o/3d3c9ac8850f866fbd79ff0c5522e8bc/build",
+          "pgid": 1678558,
+          "pid": 1678789,
+          "ppid": 1678786,
+          "start_ticks": "54618508"
+        },
+        {
+          "command": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig build-exe -OReleaseSafe --dep bounded_http -Mroot=/tmp/zig-http.seam.f0gylvbx/engine/examples/embedding/src/main.zig -OReleaseSafe -Mbounded_http=/tmp/zig-http.seam.f0gylvbx/engine/src/server.zig -lc --cache-dir .zig-cache --global-cache-dir /home/rs/.cache/zig --name embedded-http --zig-lib-dir /home/rs/.local/share/mise/installs/zig/0.16.0/lib/ --listen=- ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine/examples/embedding",
+          "exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+          "pgid": 1678558,
+          "pid": 1678793,
+          "ppid": 1678789,
+          "start_ticks": "54618510"
+        },
+        {
+          "command": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig build-exe -OReleaseSafe --dep bounded_http -Mroot=/tmp/zig-http.seam.f0gylvbx/engine/src/main.zig -OReleaseSafe -Mbounded_http=/tmp/zig-http.seam.f0gylvbx/engine/src/server.zig -lc --cache-dir .zig-cache --global-cache-dir /home/rs/.cache/zig --name zig-http --zig-lib-dir /home/rs/.local/share/mise/installs/zig/0.16.0/lib/ --listen=- ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+          "pgid": 1678558,
+          "pid": 1679097,
+          "ppid": 1678568,
+          "start_ticks": "54619569"
+        },
+        {
+          "command": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig test -OReleaseSafe -Mroot=/tmp/zig-http.seam.f0gylvbx/engine/src/api.zig -lc --cache-dir .zig-cache --global-cache-dir /home/rs/.cache/zig --name test --zig-lib-dir /home/rs/.local/share/mise/installs/zig/0.16.0/lib/ --listen=- ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+          "pgid": 1678558,
+          "pid": 1679098,
+          "ppid": 1678568,
+          "start_ticks": "54619569"
+        },
+        {
+          "command": "python3 tools/check_embedding.py --binary /tmp/zig-http.seam.f0gylvbx/engine/.zig-cache/embedding-ReleaseSafe/bin/embedded-http ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/usr/bin/python3.14",
+          "pgid": 1678558,
+          "pid": 1679099,
+          "ppid": 1678568,
+          "start_ticks": "54619569"
+        },
+        {
+          "command": "/tmp/zig-http.seam.f0gylvbx/engine/.zig-cache/embedding-ReleaseSafe/bin/embedded-http --port 0 --duration-ms 1500 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/.zig-cache/embedding-ReleaseSafe/bin/embedded-http",
+          "pgid": 1679120,
+          "pid": 1679120,
+          "ppid": 1679099,
+          "start_ticks": "54619573"
+        },
+        {
+          "command": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig test -OReleaseSafe -Mroot=/tmp/zig-http.seam.f0gylvbx/engine/src/server.zig -lc --cache-dir .zig-cache --global-cache-dir /home/rs/.cache/zig --name test --zig-lib-dir /home/rs/.local/share/mise/installs/zig/0.16.0/lib/ --listen=- ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+          "pgid": 1678558,
+          "pid": 1679196,
+          "ppid": 1678568,
+          "start_ticks": "54620541"
+        },
+        {
+          "command": "./.zig-cache/o/461eb066ce1569a036034df060f5aac5/test --cache-dir=./.zig-cache --seed=0xf8d1f8bb --listen=- ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/.zig-cache/o/461eb066ce1569a036034df060f5aac5/test",
+          "pgid": 1678558,
+          "pid": 1679321,
+          "ppid": 1678568,
+          "start_ticks": "54621664"
+        }
+      ],
+      "process_group": 1678558,
+      "sequence": 2,
+      "started_utc": "2026-09-06T13:43:53.284864+00:00",
+      "watchdog_seconds": 600
+    },
+    {
+      "cleanup": {
+        "initial_workspace_survivors": [],
+        "remaining_workspace_processes": []
+      },
+      "command": [
+        "zig",
+        "build",
+        "-Doptimize=ReleaseSafe",
+        "-j2",
+        "--summary",
+        "all"
+      ],
+      "exit_code": 0,
+      "finished_utc": "2026-09-06T13:44:43.930403+00:00",
+      "leader_pid": 1679338,
+      "observed_processes": [
+        {
+          "command": "zig build -Doptimize=ReleaseSafe -j2 --summary all ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/usr/bin/mise",
+          "pgid": 1679338,
+          "pid": 1679338,
+          "ppid": 1678262,
+          "start_ticks": "54621680"
+        }
+      ],
+      "process_group": 1679338,
+      "sequence": 3,
+      "started_utc": "2026-09-06T13:44:43.799889+00:00",
+      "watchdog_seconds": 600
+    },
+    {
+      "cleanup": {
+        "initial_workspace_survivors": [],
+        "remaining_workspace_processes": []
+      },
+      "command": [
+        "python3",
+        "-B",
+        "tests/test_compare.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "finished_utc": "2026-09-06T13:44:44.060663+00:00",
+      "leader_pid": 1679355,
+      "observed_processes": [
+        {
+          "command": "python3 -B tests/test_compare.py -v ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/usr/bin/python3.14",
+          "pgid": 1679355,
+          "pid": 1679355,
+          "ppid": 1678262,
+          "start_ticks": "54621693"
+        }
+      ],
+      "process_group": 1679355,
+      "sequence": 4,
+      "started_utc": "2026-09-06T13:44:43.930749+00:00",
+      "watchdog_seconds": 180
+    },
+    {
+      "cleanup": {
+        "initial_workspace_survivors": [],
+        "remaining_workspace_processes": []
+      },
+      "command": [
+        "python3",
+        "-B",
+        "tests/arena_lifecycle_integration.py"
+      ],
+      "exit_code": 0,
+      "finished_utc": "2026-09-06T13:44:44.300288+00:00",
+      "leader_pid": 1679357,
+      "observed_processes": [
+        {
+          "command": "python3 -B tests/arena_lifecycle_integration.py ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/usr/bin/python3.14",
+          "pgid": 1679357,
+          "pid": 1679357,
+          "ppid": 1678262,
+          "start_ticks": "54621706"
+        }
+      ],
+      "process_group": 1679357,
+      "sequence": 5,
+      "started_utc": "2026-09-06T13:44:44.060975+00:00",
+      "watchdog_seconds": 180
+    },
+    {
+      "cleanup": {
+        "initial_workspace_survivors": [],
+        "remaining_workspace_processes": []
+      },
+      "command": [
+        "python3",
+        "-B",
+        "tests/batch_integration.py"
+      ],
+      "exit_code": 0,
+      "finished_utc": "2026-09-06T13:44:48.737317+00:00",
+      "leader_pid": 1679378,
+      "observed_processes": [
+        {
+          "command": "python3 -B tests/batch_integration.py ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/usr/bin/python3.14",
+          "pgid": 1679378,
+          "pid": 1679378,
+          "ppid": 1678262,
+          "start_ticks": "54621730"
+        },
+        {
+          "command": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http --execution inline --port 0 --connections 16 --workers 0 --max-body 1024 --max-header 2048 --timeout-ms 3000 --stall-ms 1000 --send-chunk 1 --response-batch-limit 16 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http",
+          "pgid": 1679417,
+          "pid": 1679417,
+          "ppid": 1679378,
+          "start_ticks": "54621738"
+        },
+        {
+          "command": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http --execution inline --port 0 --connections 16 --workers 0 --max-body 32768 --max-header 2048 --timeout-ms 3000 --stall-ms 1000 --send-chunk 65536 --response-batch-limit 64 --callbacks-per-turn 256 --borrow-copy-threshold 0 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http",
+          "pgid": 1679573,
+          "pid": 1679573,
+          "ppid": 1679378,
+          "start_ticks": "54621762"
+        },
+        {
+          "command": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http --execution inline --port 0 --connections 2 --workers 0 --max-body 1024 --max-header 2048 --timeout-ms 1000 --stall-ms 1000 --send-chunk 65536 --index /tmp/zig-http-batch-cancel-epesd5zm/index.html --socket-send-buffer 4096 --response-batch-limit 16 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http",
+          "pgid": 1679609,
+          "pid": 1679609,
+          "ppid": 1679378,
+          "start_ticks": "54621769"
+        },
+        {
+          "command": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http --execution inline --port 0 --connections 8 --workers 0 --max-body 2097152 --max-header 2048 --timeout-ms 1000 --stall-ms 1000 --send-chunk 65536 --socket-send-buffer 4096 --prearm-receive 0 --submit-batch 0 --response-batch-limit 16 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http",
+          "pgid": 1679643,
+          "pid": 1679643,
+          "ppid": 1679378,
+          "start_ticks": "54621894"
+        },
+        {
+          "command": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http --execution inline --port 0 --connections 8 --workers 0 --max-body 2097152 --max-header 2048 --timeout-ms 1000 --stall-ms 1000 --send-chunk 65536 --socket-send-buffer 4096 --prearm-receive 1 --submit-batch 1 --response-batch-limit 16 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http",
+          "pgid": 1679659,
+          "pid": 1679659,
+          "ppid": 1679378,
+          "start_ticks": "54622032"
+        }
+      ],
+      "process_group": 1679378,
+      "sequence": 6,
+      "started_utc": "2026-09-06T13:44:44.300586+00:00",
+      "watchdog_seconds": 180
+    },
+    {
+      "cleanup": {
+        "initial_workspace_survivors": [],
+        "remaining_workspace_processes": []
+      },
+      "command": [
+        "python3",
+        "-B",
+        "tests/gather_integration.py"
+      ],
+      "exit_code": 0,
+      "finished_utc": "2026-09-06T13:44:50.325489+00:00",
+      "leader_pid": 1679669,
+      "observed_processes": [
+        {
+          "command": "python3 -B tests/gather_integration.py ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/usr/bin/python3.14",
+          "pgid": 1679669,
+          "pid": 1679669,
+          "ppid": 1678262,
+          "start_ticks": "54622174"
+        },
+        {
+          "command": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http --execution inline --port 0 --connections 16 --workers 0 --max-body 1024 --max-header 2048 --timeout-ms 3000 --stall-ms 1000 --send-chunk 65536 --response-batch-limit 1 --gather-send 1 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http",
+          "pgid": 1679696,
+          "pid": 1679696,
+          "ppid": 1679669,
+          "start_ticks": "54622184"
+        },
+        {
+          "command": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http --execution inline --port 0 --connections 4 --workers 0 --max-body 2097152 --max-header 2048 --timeout-ms 1000 --stall-ms 1000 --send-chunk 65536 --response-batch-limit 1 --gather-send 1 --socket-send-buffer 4096 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http",
+          "pgid": 1679759,
+          "pid": 1679759,
+          "ppid": 1679669,
+          "start_ticks": "54622192"
+        }
+      ],
+      "process_group": 1679669,
+      "sequence": 7,
+      "started_utc": "2026-09-06T13:44:48.737513+00:00",
+      "watchdog_seconds": 180
+    },
+    {
+      "cleanup": {
+        "initial_workspace_survivors": [],
+        "remaining_workspace_processes": []
+      },
+      "command": [
+        "python3",
+        "-B",
+        "tests/inline_integration.py"
+      ],
+      "exit_code": 0,
+      "finished_utc": "2026-09-06T13:44:50.966768+00:00",
+      "leader_pid": 1679782,
+      "observed_processes": [
+        {
+          "command": "python3 -B tests/inline_integration.py ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/usr/bin/python3.14",
+          "pgid": 1679782,
+          "pid": 1679782,
+          "ppid": 1678262,
+          "start_ticks": "54622332"
+        },
+        {
+          "command": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http --execution inline --port 0 --duration-ms 10 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http",
+          "pgid": 1679782,
+          "pid": 1679783,
+          "ppid": 1679782,
+          "start_ticks": "54622337"
+        },
+        {
+          "command": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http --execution inline --port 0 --connections 2 --workers 0 --max-body 1024 --max-header 2048 --timeout-ms 200 --stall-ms 1000 --send-chunk 65536 --response-batch-limit 1 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http",
+          "pgid": 1679802,
+          "pid": 1679802,
+          "ppid": 1679782,
+          "start_ticks": "54622349"
+        },
+        {
+          "command": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http --execution inline --port 0 --connections 4 --workers 0 --max-body 2097152 --max-header 2048 --timeout-ms 5000 --stall-ms 1000 --send-chunk 65536 --socket-send-buffer 4096 --response-batch-limit 1 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http",
+          "pgid": 1679811,
+          "pid": 1679811,
+          "ppid": 1679782,
+          "start_ticks": "54622370"
+        }
+      ],
+      "process_group": 1679782,
+      "sequence": 8,
+      "started_utc": "2026-09-06T13:44:50.325671+00:00",
+      "watchdog_seconds": 180
+    },
+    {
+      "cleanup": {
+        "initial_workspace_survivors": [],
+        "remaining_workspace_processes": []
+      },
+      "command": [
+        "python3",
+        "-B",
+        "tests/integration.py"
+      ],
+      "exit_code": 0,
+      "finished_utc": "2026-09-06T13:44:55.084466+00:00",
+      "leader_pid": 1679825,
+      "observed_processes": [
+        {
+          "command": "python3 -B tests/integration.py ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/usr/bin/python3.14",
+          "pgid": 1679825,
+          "pid": 1679825,
+          "ppid": 1678262,
+          "start_ticks": "54622397"
+        },
+        {
+          "command": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http --execution workers --port 0 --connections 16 --workers 2 --max-body 1024 --max-header 2048 --timeout-ms 3000 --stall-ms 1000 --send-chunk 7 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http",
+          "pgid": 1679826,
+          "pid": 1679826,
+          "ppid": 1679825,
+          "start_ticks": "54622400"
+        },
+        {
+          "command": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http --execution workers --port 0 --connections 2 --workers 2 --max-body 1024 --max-header 2048 --timeout-ms 2000 --stall-ms 1000 --send-chunk 65536 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http",
+          "pgid": 1679832,
+          "pid": 1679832,
+          "ppid": 1679825,
+          "start_ticks": "54622504"
+        },
+        {
+          "command": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http --execution workers --port 0 --connections 4 --workers 2 --max-body 1024 --max-header 2048 --timeout-ms 2000 --stall-ms 1000 --send-chunk 65536 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http",
+          "pgid": 1679837,
+          "pid": 1679837,
+          "ppid": 1679825,
+          "start_ticks": "54622526"
+        },
+        {
+          "command": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http --execution workers --port 0 --connections 4 --workers 1 --max-body 1024 --max-header 2048 --timeout-ms 150 --stall-ms 600 --send-chunk 65536 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http",
+          "pgid": 1679841,
+          "pid": 1679841,
+          "ppid": 1679825,
+          "start_ticks": "54622548"
+        },
+        {
+          "command": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http --execution workers --port 0 --connections 4 --workers 2 --max-body 2097152 --max-header 2048 --timeout-ms 1000 --stall-ms 1000 --send-chunk 65536 --socket-send-buffer 4096 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http",
+          "pgid": 1679850,
+          "pid": 1679850,
+          "ppid": 1679825,
+          "start_ticks": "54622645"
+        },
+        {
+          "command": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http --execution workers --port 0 --connections 4 --workers 2 --max-body 1024 --max-header 2048 --timeout-ms 3000 --stall-ms 300 --send-chunk 1 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http",
+          "pgid": 1679855,
+          "pid": 1679855,
+          "ppid": 1679825,
+          "start_ticks": "54622772"
+        }
+      ],
+      "process_group": 1679825,
+      "sequence": 9,
+      "started_utc": "2026-09-06T13:44:50.967009+00:00",
+      "watchdog_seconds": 180
+    },
+    {
+      "cleanup": {
+        "initial_workspace_survivors": [],
+        "remaining_workspace_processes": []
+      },
+      "command": [
+        "python3",
+        "-B",
+        "tools/smoke.py"
+      ],
+      "exit_code": 0,
+      "finished_utc": "2026-09-06T13:44:55.957020+00:00",
+      "leader_pid": 1679866,
+      "observed_processes": [
+        {
+          "command": "python3 -B tools/smoke.py ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/usr/bin/python3.14",
+          "pgid": 1679866,
+          "pid": 1679866,
+          "ppid": 1678262,
+          "start_ticks": "54622808"
+        },
+        {
+          "command": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http --execution inline --port 0 --connections 128 --workers 0 --max-body 65536 --max-header 16384 --timeout-ms 5000 --stall-ms 1000 --send-chunk 65536 --socket-send-buffer 65536 --duration-ms 150000 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/tmp/zig-http.seam.f0gylvbx/engine/zig-out/bin/zig-http",
+          "pgid": 1679870,
+          "pid": 1679870,
+          "ppid": 1679866,
+          "start_ticks": "54622812"
+        },
+        {
+          "command": "/usr/bin/python3 /tmp/zig-http.seam.f0gylvbx/engine/tools/benchmark.py http://127.0.0.1:38151/plaintext --connections 8 --requests 10000 --pipeline 1 --timeout 5 --deadline 38 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/usr/bin/python3.14",
+          "pgid": 1679866,
+          "pid": 1679879,
+          "ppid": 1679866,
+          "start_ticks": "54622819"
+        },
+        {
+          "command": "/usr/bin/python3 /tmp/zig-http.seam.f0gylvbx/engine/tools/benchmark.py http://127.0.0.1:38151/plaintext --connections 8 --requests 10000 --pipeline 16 --timeout 5 --deadline 38 ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/usr/bin/python3.14",
+          "pgid": 1679866,
+          "pid": 1679908,
+          "ppid": 1679866,
+          "start_ticks": "54622851"
+        },
+        {
+          "command": "/usr/bin/python3 /tmp/zig-http.seam.f0gylvbx/engine/tools/benchmark.py http://127.0.0.1:38151/index.html --connections 8 --requests 10000 --pipeline 16 --timeout 5 --deadline 38 --expect-file /tmp/zig-http.seam.f0gylvbx/engine/assets/index.html ",
+          "cwd": "/tmp/zig-http.seam.f0gylvbx/engine",
+          "exe": "/usr/bin/python3.14",
+          "pgid": 1679866,
+          "pid": 1679923,
+          "ppid": 1679866,
+          "start_ticks": "54622864"
+        }
+      ],
+      "process_group": 1679866,
+      "sequence": 10,
+      "started_utc": "2026-09-06T13:44:55.084802+00:00",
+      "watchdog_seconds": 180
+    }
+  ],
+  "complete": true,
+  "final_workspace_processes": [],
+  "finished_utc": "2026-09-06T13:44:55.958108+00:00",
+  "source_after": {
+    "entries": 32,
+    "manifest_sha256": "8e64f6697d84079b8ffc2cb46ffd277def318388b7c463830f42c103d13f4ba7"
+  },
+  "source_before": {
+    "entries": 32,
+    "manifest_sha256": "8e64f6697d84079b8ffc2cb46ffd277def318388b7c463830f42c103d13f4ba7"
+  },
+  "started_utc": "2026-09-06T13:43:43.132285+00:00"
+}
