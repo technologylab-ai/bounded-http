@@ -24,6 +24,8 @@ Windows uses overlapped sockets and an I/O completion port (IOCP).
 Application callbacks can run on the I/O owner or on fixed startup workers.
 Inline execution is the default for trusted bounded, nonblocking handlers;
 blocking callbacks must explicitly select fixed startup workers.
+Worker callbacks can [flush output without returning](docs/USING.md#flush-within-a-worker-callback).
+The same reserved worker stack resumes after the owner completes transmission.
 The [Windows receipt](reports/2026-09-06-windows-iocp.md) records native x64 evidence and its limits.
 This is the M4 implementation informed by the adjacent
 [Zig LLM Wiki](https://technologylab-ai.github.io/zigllmwiki/?page=wiki/bounded-http-server-design.md).
