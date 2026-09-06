@@ -7,8 +7,10 @@ continuations and shutdown; TCP write boundaries do not establish CQE order.
 """
 
 import argparse
+import contextlib
 from email.utils import parsedate_to_datetime
 import json
+import os
 from pathlib import Path
 import signal
 import socket
@@ -20,6 +22,12 @@ import integration as wire
 from batch_integration import get, paused
 
 
+def queued_input(server):
+    # POSIX queues input while the owner is suspended. Windows keeps the owner
+    # live; byte/order assertions still apply, without forcing completion order.
+    return paused(server) if os.name == "posix" else contextlib.nullcontext()
+
+
 def checked_response(reader, expected, head=False):
     status, headers, body = reader.response(head=head)
     wire.require(status == 200 and body == expected, "response framing/body changed across EOF")
@@ -29,8 +37,8 @@ def checked_response(reader, expected, head=False):
 
 
 def run(binary, emit, sessions):
-    # Queue complete requests and FIN before the I/O owner resumes. Borrowed
-    # input, generated output, HEAD and flush/resume all survive peer write EOF.
+    # Complete requests and FIN exercise borrowed input, generated output, HEAD
+    # and flush/resume across peer write EOF. POSIX also suspends the owner.
     # A small aggregate cap keeps output pending across multiple completions.
     for execution in ("inline", "workers"):
         for overlap in (0, 1):
@@ -44,7 +52,7 @@ def run(binary, emit, sessions):
                             str(len(payload)).encode() + b"\r\n\r\n" + payload +
                             get(b"/chunks") + get(b"/index.html", method=b"HEAD") + get(target))
                 with server.connect() as sock:
-                    with paused(server):
+                    with queued_input(server):
                         sock.sendall(requests)
                         sock.shutdown(socket.SHUT_WR)
                     reader = wire.ResponseReader(sock)
@@ -73,7 +81,7 @@ def run(binary, emit, sessions):
         with wire.Server(binary, execution="inline", workers=0, shards=1,
                          prearm_receive=overlap, send_chunk=7) as server:
             with server.connect() as sock:
-                with paused(server):
+                with queued_input(server):
                     sock.sendall(wire.REQUEST + b"POST /echo HTTP/1.1\r\nHost: localhost\r\n"
                                  b"Expect: 100-continue\r\nContent-Length: 4\r\n\r\n")
                 reader = wire.ResponseReader(sock)
@@ -96,7 +104,7 @@ def run(binary, emit, sessions):
         with wire.Server(binary, execution="inline", workers=0, shards=1,
                          prearm_receive=overlap, send_chunk=7) as server:
             with server.connect() as sock:
-                with paused(server):
+                with queued_input(server):
                     sock.sendall(wire.REQUEST + b"POST /echo HTTP/1.1\r\nHost: localhost\r\n"
                                  b"Content-Length: 9\r\n\r\nshort")
                     sock.shutdown(socket.SHUT_WR)
@@ -121,6 +129,8 @@ def main():
     wire.require(1 <= args.timeout <= 300, "finite suite watchdog required")
     receipt = dict(schema_version=1, tool="bounded-http-arena-lifecycle-integration", ok=False,
                    platform=sys.platform, server=str(args.server.resolve()), tests=[], sessions=[])
+    receipt["input_scheduling"] = ("queued during acknowledged POSIX process suspension" if os.name == "posix" else
+                                   "live Windows owner; no forced completion-order claim")
     started = time.monotonic()
 
     def watchdog(number, frame):
