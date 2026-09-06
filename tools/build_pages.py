@@ -23,7 +23,7 @@ def build():
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     if not re.fullmatch('[0-9a-f]{40}', revision):
         raise ValueError('Expected a full publication commit.')
-    repository = 'https://github.com/technologylab-ai/zig-http/blob/' + revision + '/'
+    repository = 'https://github.com/technologylab-ai/bounded-http/blob/' + revision + '/'
     directories = {'tests', 'reports'}
     vendor = json.loads((ROOT / 'docs/vendor/manifest.json').read_text())
     vendor_files = ['docs/vendor/manifest.json']

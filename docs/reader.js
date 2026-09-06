@@ -132,7 +132,7 @@
       code.className = 'language-' + language; code.textContent = body; pre.append(code); article.append(heading, pre);
     }
     decorate();
-    document.title = (article.querySelector('h1')?.textContent || path) + ' · Bounded HTTP';
+    document.title = (article.querySelector('h1')?.textContent || path) + ' · bounded/http';
     if (config.public) document.querySelector('#repository-note').textContent = 'Source and evidence links open on GitHub.';
     status.hidden = true;
     if (location.hash) requestAnimationFrame(() => document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView());
