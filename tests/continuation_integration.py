@@ -41,7 +41,7 @@ def await_count(server, key, minimum):
     while time.monotonic() < deadline:
         try:
             current = counts(server)
-        except (EOFError, ConnectionResetError, ConnectionRefusedError):
+        except (EOFError, ConnectionResetError, ConnectionAbortedError, ConnectionRefusedError):
             require(server.process.poll() is None, 'server exited while awaiting terminal state')
             time.sleep(.01)
             continue
