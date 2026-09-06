@@ -1,0 +1,90 @@
+{
+  "ok": true,
+  "head": "70f9ae5917076b664081db59c62edc4959ca5041",
+  "units": {
+    "debug": "16/16 steps succeeded; 83/89 tests passed (6 skipped)",
+    "release-safe": "16/16 steps succeeded; 83/89 tests passed (6 skipped)"
+  },
+  "wire": [
+    {
+      "suite": "arena_lifecycle_integration",
+      "passed": 8,
+      "skipped": 0,
+      "input_scheduling": "live Windows owner; no forced completion-order claim"
+    },
+    {
+      "suite": "batch_integration",
+      "passed": 25,
+      "skipped": 4,
+      "input_scheduling": null
+    },
+    {
+      "suite": "gather_integration",
+      "passed": 11,
+      "skipped": 0,
+      "input_scheduling": null
+    },
+    {
+      "suite": "inline_integration",
+      "passed": 10,
+      "skipped": 0,
+      "input_scheduling": null
+    },
+    {
+      "suite": "integration",
+      "passed": 26,
+      "skipped": 0,
+      "input_scheduling": null
+    }
+  ],
+  "wire_total": 80,
+  "wire_skipped": 4,
+  "smoke_completed": 30000,
+  "binary": {
+    "path": "D:\\a\\bounded-http\\bounded-http\\zig-out\\bin\\bounded-http.exe",
+    "sha256": "9130774c8df265c8fba2340b50577d3b828289c42643ff5e650c8a038fcbf02a",
+    "pe_machine": "8664",
+    "optimize": "ReleaseSafe",
+    "target": "x86_64-windows"
+  },
+  "host": {
+    "repository_commit": "70f9ae5917076b664081db59c62edc4959ca5041",
+    "workflow_run": "34039591972",
+    "workflow_attempt": "1",
+    "runner_image": "win25-vs2026",
+    "runner_image_version": "20260824.214.3",
+    "os_caption": "Microsoft Windows Server 2025 Datacenter",
+    "os_version": "10.0.26100",
+    "os_architecture": "X64",
+    "windows_full_build": "26100.33296",
+    "windows_display_version": "24H2",
+    "powershell_version": "7.6.5",
+    "python": "Python 3.12.10",
+    "zig_version": "0.16.0",
+    "compiler_execution": "native x64",
+    "http_execution": "native x64 Windows IOCP; not cross-compilation evidence",
+    "processors": [
+      {
+        "Name": "AMD EPYC 9V74 80-Core Processor                ",
+        "NumberOfCores": 2,
+        "NumberOfLogicalProcessors": 4
+      }
+    ],
+    "memory_bytes": 17174360064,
+    "logical_disks": [
+      {
+        "DeviceID": "C:",
+        "FileSystem": "NTFS",
+        "Size": 160467759104
+      },
+      {
+        "DeviceID": "D:",
+        "FileSystem": "NTFS",
+        "Size": 161059172352
+      }
+    ]
+  },
+  "started_utc": "2026-09-06T14:35:24.147744+00:00",
+  "finished_utc": "2026-09-06T14:38:39.717957+00:00",
+  "phase_count": 10
+}

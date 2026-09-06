@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "D:\a\bounded-http\bounded-http\tests\arena_lifecycle_integration.py", line 139, in main
+    run(args.server.resolve(), emit, receipt["sessions"])
+  File "D:\a\bounded-http\bounded-http\tests\arena_lifecycle_integration.py", line 47, in run
+    with paused(server):
+         ^^^^^^^^^^^^^^
+  File "C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "D:\a\bounded-http\bounded-http\tests\batch_integration.py", line 78, in paused
+    server.process.send_signal(signal.SIGSTOP)
+                               ^^^^^^^^^^^^^^
+AttributeError: module 'signal' has no attribute 'SIGSTOP'
+{"error": "AttributeError: module 'signal' has no attribute 'SIGSTOP'", "ok": false, "passed": 0, "platform": "win32", "schema_version": 1, "seconds": 0.078, "server": "D:\\a\\bounded-http\\bounded-http\\zig-out\\bin\\bounded-http.exe", "sessions": [], "tests": [], "tool": "bounded-http-arena-lifecycle-integration"}

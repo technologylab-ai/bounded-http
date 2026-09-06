@@ -1,0 +1,10 @@
+{
+  "agent": "Codex /root/arena_parser_review",
+  "host": "renerocksai-M3-Max-6.local",
+  "owner_pid": 92768,
+  "owner_process_start": "Sun Sep  6 16:40:26 2026",
+  "purpose": "Windows candidate70f9ae5 exact Zig0.16 native macOS regression gates; no benchmarks",
+  "started_utc": "2026-09-06T14:40:26.928802+00:00",
+  "token": "018fdd50e98b4e0695a38613eb28580e",
+  "workdir": "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot"
+}

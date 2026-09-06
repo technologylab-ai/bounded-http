@@ -9,6 +9,8 @@ printf 'checkout_commit=%s (streamed tree; require clean status for publication)
 COPYFILE_DISABLE=1 tar --no-xattrs --exclude=.git --exclude=.zig-cache \
     --exclude=zig-out --exclude=.claude/worktrees --exclude='__pycache__' -C "$repository_root" -czf - . |
     ssh -o BatchMode=yes -o ConnectTimeout=5 "$linux_host" 'set -eu
+        # Keep progress and JSON on one SSH channel so remote output stays ordered.
+        exec 2>&1
         run_directory=$(mktemp -d /tmp/bounded-http.XXXXXX)
         cleanup() {
             case "$run_directory" in

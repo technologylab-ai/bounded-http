@@ -26,8 +26,10 @@ UnsupportedTransferEncoding, ExpectationFailed, UnsupportedVersion.
 
 ## Transport
 
-`src/transport.zig` exports selected `Backend`, `Socket` (i32 for POSIX MVP),
+`src/transport.zig` exports selected `Backend`, `Socket` (i32),
 `Completion { token: u64, result: i32 }` and `name`.
+POSIX adapters use file descriptors as sockets.
+Windows uses logical table indices and retains pointer-sized Winsock handles separately.
 Operations are addressed by caller-chosen cells: `cellCount(max_connections)`
 = `4 × max_connections + 2` fixed records. The server numbers them receive
 cell = slot index, send cell = slots + index, their cancel cells at 2 × slots
@@ -45,7 +47,9 @@ Backend methods: `init(allocator, max_connections: u16, port: u16, reuse_port: b
 `flush() !void` to submit queued operations before the next poll,
 `close(cell, socket) void`, `shutdown(socket) void`, `port() u16`.
 Accepted sockets are returned as nonnegative completion results; zero recv is EOF;
-negative results are terminal OS failures. Cancellation reports target and
+negative results are terminal failures in the adapter's error representation.
+Windows translates selected Winsock errors into the common result representation.
+Cancellation reports target and
 cancel-request completions separately; cancelling an idle cell reports ENOENT.
 Buffers and gather vectors remain borrowed until the target completion, and
 close is only after outstanding operations return. A busy cell yields
@@ -53,20 +57,29 @@ close is only after outstanding operations return. A busy cell yields
 
 Linux uses actual low-level io_uring accept/recv/send, runtime opcode probes,
 finite queues and explicit cancel drain. macOS uses nonblocking sockets/kqueue
-and the same completion interface. IPv4 loopback binding initially; CLI can
+and the same completion interface.
+Windows uses overlapped `AcceptEx`, `WSARecv`, and `WSASend` through one completion port.
+IPv4 loopback binding initially; CLI can
 expose other bind addresses later. No per-operation allocation.
 
-Gather vectors live in the caller's per-connection startup storage; the adapter
-points its msghdr at them and copies nothing. Up to `max_vectors` (1024) may be
+Gather vectors live in the caller's per-connection startup storage.
+Linux points its `msghdr` at those vectors.
+Windows converts descriptors into fixed `WSABUF` storage, which Winsock captures during submission.
+Every adapter retains payload ownership until terminal completion.
+Up to `max_vectors` (1024) may be
 submitted; the server bounds a batch at `2 × response_batch_limit + 1`. The
 server caps aggregate bytes and advances partial sends across vector
-boundaries. Adapter `operation_bytes` allows Config.heapBytes to include exact
-requested operation storage; these counts exclude kernel ring/socket allocations.
+boundaries. `transport.backendHeapBytes()` includes exact requested backend heap storage.
+Windows adds its socket table and completion queue to operation storage.
+These counts exclude provider and kernel socket resources.
 With `reuse_port`, several backends bind one port and Linux distributes
 connections across them in the tested configuration. The M3 Max branch fixture
 observed every connection at the last-bound listener, so the current macOS
 configuration rejects multiple shards. That observation is not a universal
 XNU API guarantee.
+Windows requires one shard and exclusive listener binding.
+Its cancellation acknowledgement never substitutes for the target operation's completion packet.
+The adapter keeps default completion notifications, including immediate-success packets.
 
 
 ## Cluster startup and application ownership

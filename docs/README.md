@@ -8,6 +8,7 @@ The HTML document works offline and includes all six SVG graphics.
 The [ownership contract](OWNERSHIP.md) records the detailed storage and cancellation rules.
 The [performance design](PERF-ARCHITECTURE.md) preserves the arena/shard experiment's implementation rationale.
 The [qualified comparison](../reports/2026-09-05-arena-adoption.md) records measurements and their limits.
+The [Windows receipt](../reports/2026-09-06-windows-iocp.md) records native IOCP verification and its exclusions.
 
 ## Maintain the documents
 

@@ -1,0 +1,123 @@
+{
+  "base": "http://127.0.0.1:54406/bounded-http/",
+  "browser": "Chrome/152.0.7977.76",
+  "cases": [
+    {
+      "name": "brand-byline-and-headline",
+      "ok": true,
+      "evidence": {
+        "title": "bounded/http — Architecture and performance",
+        "brand": "bounded/http",
+        "byline": "for servers that stay within their bounds",
+        "headline": "Fast by design. Explicit about limits.",
+        "graphics": 6
+      }
+    },
+    {
+      "name": "historical-chart-identity",
+      "ok": true,
+      "evidence": {
+        "labels": 2,
+        "descriptions": 2,
+        "note": "These measurements predate the bounded/http rename. The comparison server is libreactor. Each connection had sixteen outstanding requests. Both servers used three logical processors. The ratio compares medians from three trials per configuration. The measurements describe local experiments, not production capacity."
+      }
+    },
+    {
+      "name": "embedding-names-and-source-links",
+      "ok": true,
+      "evidence": {
+        "title": "Using bounded/http · bounded/http",
+        "raw": "http://127.0.0.1:54406/bounded-http/docs/USING.md?raw=1",
+        "highlighted": 1
+      }
+    },
+    {
+      "name": "architecture-diagrams-and-navigation",
+      "ok": true,
+      "evidence": {
+        "title": "bounded/http architecture · bounded/http",
+        "images": 4,
+        "brand": "bounded/http",
+        "links": [
+          "http://127.0.0.1:54406/bounded-http/docs/read.html?file=docs%2FUSING.md",
+          "https://github.com/technologylab-ai/bounded-http/blob/02f0e2b32c2ca67e44e017a2c8814600c154a17d/src/main.zig",
+          "https://github.com/technologylab-ai/bounded-http/blob/02f0e2b32c2ca67e44e017a2c8814600c154a17d/docs/OWNERSHIP.md",
+          "https://github.com/technologylab-ai/bounded-http/blob/02f0e2b32c2ca67e44e017a2c8814600c154a17d/src/transport_linux.zig",
+          "https://github.com/technologylab-ai/bounded-http/blob/02f0e2b32c2ca67e44e017a2c8814600c154a17d/src/transport_macos.zig",
+          "https://github.com/technologylab-ai/bounded-http/blob/02f0e2b32c2ca67e44e017a2c8814600c154a17d/src/transport_windows.zig",
+          "https://github.com/technologylab-ai/bounded-http/blob/02f0e2b32c2ca67e44e017a2c8814600c154a17d/src/main.zig",
+          "https://github.com/technologylab-ai/bounded-http/blob/02f0e2b32c2ca67e44e017a2c8814600c154a17d/src/server.zig",
+          "https://github.com/technologylab-ai/bounded-http/blob/02f0e2b32c2ca67e44e017a2c8814600c154a17d/src/api.zig",
+          "https://github.com/technologylab-ai/bounded-http/blob/02f0e2b32c2ca67e44e017a2c8814600c154a17d/src/http.zig",
+          "https://github.com/technologylab-ai/bounded-http/blob/02f0e2b32c2ca67e44e017a2c8814600c154a17d/src/budget.zig",
+          "https://github.com/technologylab-ai/bounded-http/blob/02f0e2b32c2ca67e44e017a2c8814600c154a17d/src/transport.zig",
+          "https://github.com/technologylab-ai/bounded-http/blob/02f0e2b32c2ca67e44e017a2c8814600c154a17d/src/transport_linux.zig",
+          "https://github.com/technologylab-ai/bounded-http/blob/02f0e2b32c2ca67e44e017a2c8814600c154a17d/src/transport_macos.zig",
+          "https://github.com/technologylab-ai/bounded-http/blob/02f0e2b32c2ca67e44e017a2c8814600c154a17d/src/transport_windows.zig",
+          "https://github.com/technologylab-ai/bounded-http/blob/02f0e2b32c2ca67e44e017a2c8814600c154a17d/build.zig",
+          "http://127.0.0.1:54406/bounded-http/docs/read.html?file=docs%2FUSING.md",
+          "https://github.com/technologylab-ai/bounded-http/blob/02f0e2b32c2ca67e44e017a2c8814600c154a17d/docs/INTERFACES.md",
+          "https://github.com/technologylab-ai/bounded-http/blob/02f0e2b32c2ca67e44e017a2c8814600c154a17d/docs/EVIDENCE.md",
+          "https://github.com/technologylab-ai/bounded-http/blob/02f0e2b32c2ca67e44e017a2c8814600c154a17d/ROADMAP.md"
+        ]
+      }
+    },
+    {
+      "name": "windows-platform-labels-and-native-receipt",
+      "ok": true,
+      "evidence": {
+        "paper": {
+          "label": "ZIG 0.16.0\nLINUX + MACOS + WINDOWS\nEXPERIMENTAL FRAMEWORK\nArchitecture guide ↗\nIntegration guide ↗",
+          "width": 181,
+          "available": 181
+        },
+        "reader": {
+          "label": "ZIG 0.16.0\nLINUX + MACOS + WINDOWS",
+          "width": 197,
+          "available": 197
+        },
+        "receiptRendered": true
+      }
+    },
+    {
+      "name": "mobile-brand-and-reader",
+      "ok": true,
+      "evidence": [
+        {
+          "viewport": 390,
+          "width": 390,
+          "body": 390,
+          "brand": "bounded/http"
+        },
+        {
+          "viewport": 390,
+          "width": 390,
+          "body": 390,
+          "brand": "bounded/http"
+        }
+      ]
+    },
+    {
+      "name": "offline-whitepaper-without-javascript",
+      "ok": true,
+      "evidence": {
+        "title": "bounded/http — Architecture and performance",
+        "graphics": 6,
+        "byline": "for servers that stay within their bounds"
+      }
+    },
+    {
+      "name": "print-keeps-brand-and-both-charts",
+      "ok": true,
+      "evidence": {
+        "footer": "bounded/http\nArchitecture and performance · Paper 01\nOffline document · Embedded SVG graphics\nExperimental software · Exact Zig 0.16.0",
+        "charts": [
+          "block",
+          "block"
+        ],
+        "headline": "Fast by design.\nExplicit about limits."
+      }
+    }
+  ],
+  "exceptions": []
+}

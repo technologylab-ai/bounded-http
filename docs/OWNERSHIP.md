@@ -223,10 +223,15 @@ fixed ten-digit chunk-size field before the data and fill it when frozen.
 
 A drain describes the batch as at most `2 × response_batch_limit + 1` vectors in
 per-connection startup storage: adjacent arena runs merge, each borrow is
-inserted where its cell recorded it. A one-vector selection uses SEND, several
-use SENDMSG; both count as gather-mode operations. The transport references the
-caller's vectors without copying them and keeps that reference until the
-terminal completion. A positive completion can cross several vectors; the
+inserted where its cell recorded it.
+Linux selects SEND for one vector and SENDMSG for several vectors.
+Both selections count as gather-mode operations.
+Windows uses `WSASend` for either vector shape.
+The common contract retains caller vectors and payloads until terminal completion.
+Linux references those vectors directly.
+Windows converts descriptors into fixed backend storage, which Winsock captures during submission.
+That conversion does not copy the payload.
+A positive completion can cross several vectors; the
 cursor advances by the aggregate count, capped by send_chunk and i32. A
 cancellation acknowledgement alone still cannot release target storage. The
 scalar switch exists for controlled comparison with the same ownership rules.
@@ -279,7 +284,9 @@ at most 16 because each shard reserves full storage) and one elsewhere. Optional
 Only inline execution supports several shards. Linux reuse-port distributes connections across listeners in the tested
 configuration. The preliminary M3 Max fixture observed all connections at the
 last-bound listener; macOS currently rejects more than one shard. This fixture
-is not a universal claim about every XNU version or socket configuration. Merged STATS sum counters
+is not a universal claim about every XNU version or socket configuration.
+Windows also requires one shard and uses exclusive listener binding.
+Merged STATS sum counters
 and take maxima; per-shard admission is printed separately. A shard that cannot
 reconcile ownership by the shutdown deadline still ends the whole process.
 

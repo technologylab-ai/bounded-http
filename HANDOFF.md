@@ -1,3 +1,36 @@
+# Windows HTTP and platform documentation handoff — 2026-09-06
+
+The experimental Windows IOCP adapter is implemented and native x64 verification passed.
+The whitepaper and Markdown reader now show `ZIG 0.16.0` above `LINUX + MACOS + WINDOWS`.
+The architecture, integration, ownership, and evidence guides describe Windows limits and shutdown.
+The byline remains “for servers that stay within their bounds”.
+
+The [Windows report](reports/2026-09-06-windows-iocp.md) preserves raw evidence and exact environments.
+Clean pushed candidate `70f9ae5917076b664081db59c62edc4959ca5041` passed native Windows run [34039591972](https://github.com/technologylab-ai/bounded-http/actions/runs/34039591972).
+Windows Debug and ReleaseSafe each passed 16 steps and 83 tests, with six explicit skips.
+Windows passed 80 wire cases, nine comparator tests, both embedding probes, and 30,000 exact smoke responses.
+Four maximum-cell wire fixtures require POSIX suspension and remain excluded on Windows.
+The first run's Python suspension failure is preserved separately; its overall result remains failed.
+
+The same candidate passed both Mac and Linux native regression gates.
+Each host passed 84 wire cases, nine comparator tests, both embedding probes, and 30,000 exact smoke responses.
+Mac passed 78 tests with two Linux-only skips per mode; Linux passed all 80 tests per mode.
+Both host reservations were released after owned process cleanup.
+Eight development browser checks passed, including both Windows labels and the native receipt reader.
+Publication gates rerun on the final pushed main revision; use the recorded workflow commit when evaluating later runs.
+
+Windows remains one shard, IPv4 loopback, and ordinary copied socket I/O.
+The socket table bounds owned handles; provider allocation and delayed TCP cleanup remain outside framework heap accounting.
+Windows performance, ARM64, service controls, physical deployment, and the wiki's M3-006 remain unqualified or postponed.
+The [roadmap](ROADMAP.md) still contains API, reliability, performance, and higher-level work.
+This delivery does not complete M4.
+
+PR #1 and the `bounded_http` response reservation API remain merged.
+The canonical directory is `../bounded-http`; `../zig-http` remains a compatibility symlink.
+Keep `/tmp/zig-http-measurement.lock` unchanged and preserve other agents' worktrees.
+The Tailscale documentation server remains available through the compatibility path.
+The prior checkpoints below retain their original names, dates, and evidence scope.
+
 # bounded/http rename handoff — 2026-09-06
 
 The user selected **bounded/http** as the public name.

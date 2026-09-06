@@ -1,0 +1,87 @@
+Linux omarx1 7.1.9-arch1-2 #1 SMP PREEMPT_DYNAMIC Fri, 21 Aug 2026 22:18:59 +0000 x86_64 GNU/Linux
+Architecture:                            x86_64
+CPU op-mode(s):                          32-bit, 64-bit
+Address sizes:                           42 bits physical, 48 bits virtual
+Byte Order:                              Little Endian
+CPU(s):                                  8
+On-line CPU(s) list:                     0-7
+Vendor ID:                               GenuineIntel
+Model name:                              Intel(R) Core(TM) Ultra 7 258V
+CPU family:                              6
+Model:                                   189
+Thread(s) per core:                      1
+Core(s) per socket:                      8
+Socket(s):                               1
+Stepping:                                1
+Microcode version:                       0x128
+CPU(s) scaling MHz:                      83%
+CPU max MHz:                             4800.0000
+CPU min MHz:                             400.0000
+BogoMIPS:                                6604.80
+Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdt_a rdseed adx smap clflushopt clwb intel_pt sha_ni xsaveopt xsavec xgetbv1 xsaves split_lock_detect user_shstk avx_vnni lass lam wbnoinvd dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp hwp_pkg_req hfi vnmi umip pku ospke waitpkg gfni vaes vpclmulqdq rdpid bus_lock_detect movdiri movdir64b fsrm md_clear serialize pconfig arch_lbr ibt flush_l1d arch_capabilities
+Virtualization:                          VT-x
+L1d cache:                               320 KiB (8 instances)
+L1i cache:                               512 KiB (8 instances)
+L2 cache:                                14 MiB (5 instances)
+L3 cache:                                12 MiB (1 instance)
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0-7
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Ghostwrite:                Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Old microcode:             Not affected
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Not affected
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS Not affected; BHI BHI_DIS_S
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Not affected
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Mitigation; IBPB before exit to userspace
+0.16.0
+.{
+    .zig_exe = "/home/rs/.local/share/mise/installs/zig/0.16.0/zig",
+    .lib_dir = ".local/share/mise/installs/zig/0.16.0/lib",
+    .std_dir = ".local/share/mise/installs/zig/0.16.0/lib/std",
+    .global_cache_dir = ".cache/zig",
+    .version = "0.16.0",
+    .target = "x86_64-linux.7.1.9...7.1.9-gnu.2.44",
+    .env = .{
+        .ZIG_GLOBAL_CACHE_DIR = null,
+        .ZIG_LOCAL_CACHE_DIR = null,
+        .ZIG_LIB_DIR = null,
+        .ZIG_LIBC = null,
+        .ZIG_BUILD_RUNNER = null,
+        .ZIG_BUILD_ERROR_STYLE = null,
+        .ZIG_BUILD_MULTILINE_ERRORS = null,
+        .ZIG_VERBOSE_LINK = null,
+        .ZIG_VERBOSE_CC = null,
+        .ZIG_DEBUG_CMD = null,
+        .ZIG_IS_DETECTING_LIBC_PATHS = null,
+        .ZIG_IS_TRYING_TO_NOT_CALL_ITSELF = null,
+        .NIX_CFLAGS_COMPILE = null,
+        .NIX_CFLAGS_LINK = null,
+        .NIX_LDFLAGS = null,
+        .C_INCLUDE_PATH = null,
+        .CPLUS_INCLUDE_PATH = null,
+        .LIBRARY_PATH = null,
+        .CC = null,
+        .NO_COLOR = null,
+        .CLICOLOR_FORCE = null,
+        .XDG_CACHE_HOME = null,
+        .LOCALAPPDATA = null,
+        .HOME = "/home/rs",
+        .PROGRAMDATA = null,
+        .HOMEBREW_PREFIX = null,
+    },
+}
+performance
+powersave
+performance

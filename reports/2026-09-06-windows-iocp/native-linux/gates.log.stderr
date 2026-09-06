@@ -1,0 +1,137 @@
+Build Summary: 16/16 steps succeeded; 80/80 tests passed
+verify success
++- compile exe bounded-http Debug native success 2s MaxRSS:365M
++- zig fmt --check success
++- run python3 success 39ms
++- run python3 success 1s
+|  +- run /home/rs/.local/share/mise/installs/zig/0.16.0/zig success 3s
++- run test 15 pass (15 total) 34ms MaxRSS:8M
+|  +- compile test Debug native success 2s MaxRSS:347M
++- run test 9 pass (9 total) 8ms MaxRSS:8M
+|  +- compile test Debug native success 2s MaxRSS:348M
++- run test 1 pass (1 total) 7ms MaxRSS:8M
+|  +- compile test Debug native success 2s MaxRSS:332M
++- run test 7 pass (7 total) 30ms MaxRSS:8M
+|  +- compile test Debug native success 2s MaxRSS:351M
++- run test 48 pass (48 total) 70ms MaxRSS:8M
+   +- compile test Debug native success 3s MaxRSS:393M
+
+Build Summary: 16/16 steps succeeded; 80/80 tests passed
+verify success
++- compile exe bounded-http ReleaseSafe native success 13s MaxRSS:484M
++- zig fmt --check success
++- run python3 success 31ms
++- run python3 success 1s
+|  +- run /home/rs/.local/share/mise/installs/zig/0.16.0/zig success 14s
++- run test 15 pass (15 total) 5ms MaxRSS:9M
+|  +- compile test ReleaseSafe native success 15s MaxRSS:433M
++- run test 9 pass (9 total) 2ms MaxRSS:9M
+|  +- compile test ReleaseSafe native success 14s MaxRSS:414M
++- run test 1 pass (1 total) 2ms MaxRSS:8M
+|  +- compile test ReleaseSafe native success 10s MaxRSS:410M
++- run test 7 pass (7 total) 24ms MaxRSS:9M
+|  +- compile test ReleaseSafe native success 9s MaxRSS:436M
++- run test 48 pass (48 total) 38ms MaxRSS:8M
+   +- compile test ReleaseSafe native success 13s MaxRSS:485M
+
+test_abba_keeps_equal_workload_adjacent_and_balances_samples (__main__.WrkReceiptTests.test_abba_keeps_equal_workload_adjacent_and_balances_samples) ... ok
+test_abba_rejects_ambiguous_or_non_pair_comparisons (__main__.WrkReceiptTests.test_abba_rejects_ambiguous_or_non_pair_comparisons) ... ok
+test_any_error_invalidates_trial (__main__.WrkReceiptTests.test_any_error_invalidates_trial) ... ok
+test_counts_are_already_responses_not_batches (__main__.WrkReceiptTests.test_counts_are_already_responses_not_batches) ... ok
+test_current_and_historical_framework_names_retain_validation (__main__.WrkReceiptTests.test_current_and_historical_framework_names_retain_validation) ... ok
+test_default_shuffle_retains_each_requested_sample_once (__main__.WrkReceiptTests.test_default_shuffle_retains_each_requested_sample_once) ... ok
+test_incomplete_or_ambiguous_receipt_rejected (__main__.WrkReceiptTests.test_incomplete_or_ambiguous_receipt_rejected) ... ok
+test_invalid_latency_does_not_invalidate_response_count (__main__.WrkReceiptTests.test_invalid_latency_does_not_invalidate_response_count) ... ok
+test_required_power_profile_cannot_silently_change_or_disappear (__main__.WrkReceiptTests.test_required_power_profile_cannot_silently_change_or_disappear) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.001s
+
+OK
+PASS half_close_inline_prearm_0
+PASS half_close_inline_prearm_1
+PASS half_close_workers_prearm_0
+PASS half_close_workers_prearm_1
+PASS expect_body_and_eof_prearm_0
+PASS expect_body_and_eof_prearm_1
+PASS incomplete_eof_preserves_prefix_prearm_0
+PASS incomplete_eof_preserves_prefix_prearm_1
+PASS batch_limit_configuration_rejected
+PASS mixed_31_32_limit_1_aggregate_65536
+PASS mixed_31_32_limit_2_aggregate_65536
+PASS mixed_31_32_limit_4_aggregate_65536
+PASS mixed_31_32_limit_16_aggregate_65536
+PASS mixed_31_32_limit_16_aggregate_1
+PASS mixed_31_32_limit_16_aggregate_17
+PASS distinct_generated_output_cells_limit_1
+PASS distinct_generated_output_cells_limit_16
+PASS deep_generated_pipeline_32_batch_limit_16_and_reuse
+PASS deep_borrowed_body_pipeline_32_batch_limit_16_and_reuse
+PASS deep_generated_pipeline_64_batch_limit_16_and_reuse
+PASS deep_borrowed_body_pipeline_64_batch_limit_16_and_reuse
+PASS deep_generated_pipeline_128_batch_limit_16_and_reuse
+PASS deep_borrowed_body_pipeline_128_batch_limit_16_and_reuse
+PASS deep_generated_pipeline_128_batch_limit_16_and_reuse_overlap
+PASS deep_borrowed_body_pipeline_128_batch_limit_16_and_reuse_overlap
+PASS incomplete_expect_rejection_and_close_preserve_prefix_order
+PASS distinct_finished_request_bodies_and_headers_survive_partial_sends
+PASS buffered_demo_output_limit_returns_ordered_413
+PASS maximum_64_generated_chunked_cells_cap_65536
+PASS maximum_64_generated_chunked_cells_cap_23
+PASS maximum_64_borrowed_body_chunked_cells_cap_65536
+PASS maximum_64_borrowed_body_chunked_cells_cap_23
+PASS global_callback_budget_rotates_busy_connections
+PASS batch_flush_barrier_and_128_empty_resumes
+PASS multi_cell_frozen_batch_deadline_cancel_and_recovery
+PASS borrowed_batch_slow_reader_deadline_recovery_shutdown
+PASS borrowed_batch_slow_reader_deadline_recovery_shutdown_overlap
+PASS inline_plaintext_scalar_operation_count
+PASS inline_plaintext_gather_operation_count
+PASS workers_plaintext_scalar_operation_count
+PASS workers_plaintext_gather_operation_count
+PASS gather_wire_aggregate_cap_1
+PASS gather_wire_aggregate_cap_7
+PASS gather_wire_aggregate_cap_123
+PASS gather_wire_aggregate_cap_124
+PASS gather_wire_aggregate_cap_125
+PASS gather_wire_aggregate_cap_65536
+PASS pending_gather_send_cancellation_drains_owners_and_recovers
+PASS explicit_inline_configuration_and_zero_worker_default
+PASS inline_plaintext
+PASS inline_pipeline_16_partial_sends_and_close
+PASS inline_borrowed_echo_at_body_limit
+PASS inline_chunked_flush_resume_then_pipeline
+PASS inline_128_empty_flushes_without_idle_poll_wait
+PASS inline_malformed_and_oversize_rejection_then_recovery
+PASS inline_blocking_demo_route_disabled
+PASS inline_connection_cap_deadlines_and_recovery
+PASS inline_shutdown_with_live_receive_and_partial_send_borrows
+PASS plaintext
+PASS head_then_keepalive
+PASS startup_loaded_html
+PASS unknown_route
+PASS absolute_uri_case_insensitive_scheme_and_query
+PASS fragmented_headers_and_binary_body
+PASS exact_body_limit
+PASS chunked_echo_and_pipeline_suffix
+PASS expect_100_continue
+PASS pipeline_16_and_connection_close
+PASS multiple_flushes_partial_sends_and_resume
+PASS oversize_content_length
+PASS oversize_expect_without_100
+PASS oversize_header_block
+PASS conflicting_framing
+PASS conflicting_lengths
+PASS missing_host
+PASS whitespace_before_field_colon
+PASS unsupported_expectation
+PASS cumulative_chunked_body_limit
+PASS healthy_progress_while_other_worker_stalls
+PASS connection_cap_and_recovery
+PASS simultaneous_connection_and_body_limits_then_recovery
+PASS incomplete_and_handler_deadlines_then_recovery
+PASS slow_reader_bounded_output_and_deadline
+PASS shutdown_with_live_receive_and_worker_borrows
+PASS plaintext_p1: 10000 responses (Python/client-bound)
+PASS plaintext_p16: 10000 responses (Python/client-bound)
+PASS html_p16: 10000 responses (Python/client-bound)

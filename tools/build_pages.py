@@ -12,7 +12,8 @@ from urllib.parse import parse_qs, quote, unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / '.zig-cache/github-pages'
-DOCUMENTS = ['docs/ARCHITECTURE.md', 'docs/USING.md']
+DOCUMENTS = ['docs/ARCHITECTURE.md', 'docs/USING.md',
+             'reports/2026-09-06-windows-iocp.md']
 DIAGRAMS = ['docs/diagrams/' + name + '.svg' for name in
             ('topology', 'startup', 'request-lifecycle', 'output-arena')]
 READER = ['docs/read.html', 'docs/reader.js', 'docs/reader.css']

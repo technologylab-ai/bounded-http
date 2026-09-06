@@ -1,6 +1,6 @@
 # bounded/http roadmap
 
-The current deliverable is a working Linux/macOS MVP to iterate on ownership and
+The current deliverable is a working Linux/macOS/Windows MVP to iterate on ownership and
 pending/resume. This is a separate project from the evidence wiki.
 
 | Item | State | Boundary |
@@ -13,12 +13,12 @@ pending/resume. This is a separate project from the evidence wiki.
 | Experiment API | queued | Compare explicit continuations with alternatives; add finish/cancel release notifications for dynamic leases, then consider arbitrary app task integration. |
 | Scheduling/copy improvements | partial | Direct Linux operation cells and configurable batch/callback budgets were measured on the pre-arena implementation (reports/2026-09-05-operation-cells.md, reports/2026-09-05-batch-quantum.md). The adopted arena/shard base (reports/2026-09-05-arena-adoption.md; original reference report preserved) supersedes them: output arena with heads written at begin, ready-ring scheduler, lane-scanning parser, cell-addressed transport with caller-owned vectors, and a reuse-port shard cluster, gated on Mac/Linux. Adoption hardens worker cache ownership, prearmed EOF/interim ordering, partial startup and secondary-shard failure, with exact coordinator/stack accounting. Remaining: profiled per-request efficiency at one core (parser attribution unproven), SINGLE_ISSUER/DEFER_TASKRUN ring modes, macOS shard distribution. |
 | Reliability qualification | queued | Startup-failure and forced completion-order witnesses now exist. Remaining: broader deterministic fault/schedule injection, long mixed maximum-load runs, syscall failure catalog, full process/kernel resource accounting and shutdown diagnostics. |
-| Windows HTTP adapter | running | Resumed by the user on 2026-09-06. The transport agent implements bounded IOCP; the platform agent prepares portability and hosted runtime gates. No Windows runtime result is claimed yet. |
+| Windows HTTP adapter | done | Experimental one-shard IOCP adapter; native x64 Windows Server 2025 gate passed Debug/ReleaseSafe, 80 wire cases, and 30,000 exact smoke responses. Four POSIX suspension fixtures remain excluded. The 2026-09-06 Windows receipt preserves source identity, ownership limits, watchdogs, and raw results. Physical deployment and Windows performance remain unqualified. |
 | Comparative performance | partial | Pinned Linux mrhttp/libreactor comparison: 54 main + 18 client-sensitivity trials; inline and gather A/B sweeps preserved separately. Batch1/16 and one-core comparisons are complete; client depths32/64/128 and a separate recorded-performance-profile sweep are complete. Preserve the unresolved fixed-batch gap and prior unknown-profile observations. The integrated arena/shard candidate adds36 qualified Linux trials: three-core Zig/libreactor median ratios0.957/0.909/0.860 at depths1/16/128, one-core1.106/0.778/0.596; raw ranges and ownership checks retained. Remaining: HTML/Mac comparisons, dedicated-host/NIC saturation and qualified request tails; wrk corrected percentiles were rejected. |
 | Higher-level features | queued | TLS boundary, routing/middleware, upload protocol and application state APIs after the core experiment. |
 
 The wiki's M3-006 Windows deployment qualification stays postponed by user
-decision. It is distinct from this project's future Windows HTTP adapter.
+decision. It is distinct from this project's native Windows HTTP slice.
 
 Current cadence: macOS correctness and Linux runtime/performance, with Windows
 HTTP builds and hosted runtime gates explicitly resumed on 2026-09-06. Coordinate host

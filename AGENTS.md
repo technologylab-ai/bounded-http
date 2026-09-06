@@ -46,5 +46,8 @@ measurement processes that may not honor the new protocol. Retain your lock
 through child cleanup and remove only your own metadata/directory. Never steal
 an old lock by age alone. The full cooperative protocol is in the sibling wiki's
 `docs/platform-testing.md`. Mac measurements by another agent take precedence
-while that agent holds its reservation. Windows performance/publication gates
-are deferred during the current Linux/macOS HTTP tuning loop by user decision.
+while that agent holds its reservation.
+The user resumed Windows HTTP support on 2026-09-06.
+Use the manual Windows workflow for native x64 correctness and publication gates.
+Windows performance comparisons remain outside the current scope.
+The wiki's M3-006 physical Windows deployment qualification remains postponed.

@@ -1,0 +1,112 @@
+{
+  "revision": "70f9ae5917076b664081db59c62edc4959ca5041",
+  "scope": "clean pushed candidate native macOS/Linux regression gates; no new timed comparison",
+  "macos": {
+    "wire": [
+      {
+        "receipt": "arena_lifecycle-integration.json",
+        "passed": 8,
+        "ok": true
+      },
+      {
+        "receipt": "batch-integration.json",
+        "passed": 29,
+        "ok": true
+      },
+      {
+        "receipt": "gather-integration.json",
+        "passed": 11,
+        "ok": true
+      },
+      {
+        "receipt": "inline-integration.json",
+        "passed": 10,
+        "ok": true
+      },
+      {
+        "receipt": "integration.json",
+        "passed": 26,
+        "ok": true
+      }
+    ],
+    "wire_total": 84,
+    "successful_session_stats_checked": 56,
+    "live_or_late_allocation_anomalies": [],
+    "comparator_tests": 9,
+    "smoke_completed": 30000,
+    "binary_sha256": "fa0ecc1b4e34c06a44733ef287955f258ed679d2e81e861a90454b7735115f34",
+    "environment": {
+      "cpu": {
+        "logical_count": 16,
+        "model": "Apple M3 Max",
+        "physical_count": 16
+      },
+      "hostname": "renerocksai-M3-Max-6.local",
+      "kernel_release": "25.6.0",
+      "kernel_version": "Darwin Kernel Version 25.6.0: Fri Jul 31 19:18:53 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6031",
+      "machine": "arm64",
+      "network": "IPv4 TCP loopback; client and server share this host",
+      "physical_memory_bytes": 137438953472,
+      "platform": "macOS-26.6.2-arm64-arm-64bit",
+      "python": "3.9.6",
+      "python_executable": "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+      "system": "Darwin"
+    },
+    "finished_utc": "2026-09-06T14:41:01.044709+00:00",
+    "gate_ok": true
+  },
+  "linux": {
+    "wire": [
+      {
+        "receipt": "bounded-http-arena-lifecycle-integration.json",
+        "passed": 8,
+        "ok": true
+      },
+      {
+        "receipt": "bounded-http-batch-integration.json",
+        "passed": 29,
+        "ok": true
+      },
+      {
+        "receipt": "bounded-http-gather-integration.json",
+        "passed": 11,
+        "ok": true
+      },
+      {
+        "receipt": "bounded-http-inline-integration.json",
+        "passed": 10,
+        "ok": true
+      },
+      {
+        "receipt": "bounded-http-integration.json",
+        "passed": 26,
+        "ok": true
+      }
+    ],
+    "wire_total": 84,
+    "successful_session_stats_checked": 56,
+    "live_or_late_allocation_anomalies": [],
+    "comparator_tests": 9,
+    "smoke_completed": 30000,
+    "binary_sha256": "b23ddaa0040ec485666b032176821814b4067ce1617b44b75a9d3e5c020707c2",
+    "environment": {
+      "cpu": {
+        "logical_count": 8,
+        "model": "Intel(R) Core(TM) Ultra 7 258V",
+        "physical_count": null
+      },
+      "hostname": "omarx1",
+      "kernel_release": "7.1.9-arch1-2",
+      "kernel_version": "#1 SMP PREEMPT_DYNAMIC Fri, 21 Aug 2026 22:18:59 +0000",
+      "machine": "x86_64",
+      "network": "IPv4 TCP loopback; client and server share this host",
+      "physical_memory_bytes": 33101041664,
+      "platform": "Linux-7.1.9-arch1-2-x86_64-with-glibc2.44",
+      "python": "3.14.7",
+      "python_executable": "/usr/bin/python3",
+      "system": "Linux"
+    },
+    "finished_utc": "2026-09-06T14:42:22.867602+00:00",
+    "gate_ok": true
+  }
+}

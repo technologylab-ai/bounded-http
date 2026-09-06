@@ -1,0 +1,10 @@
+START verify-debug
+PASS verify-debug
+START verify-release-safe
+PASS verify-release-safe
+START build-release-safe
+PASS build-release-safe
+START comparator-receipts
+PASS comparator-receipts
+START arena_lifecycle_integration
+RuntimeError: arena_lifecycle_integration failed; inspect arena_lifecycle_integration.log

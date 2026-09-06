@@ -1,0 +1,16 @@
+{
+  "architecture": "arm64",
+  "cpu": "Apple M3 Max",
+  "host": "renerocksai-M3-Max-6.local",
+  "kernel": "Darwin renerocksai-M3-Max-6.local 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:18:53 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6031 arm64",
+  "logical_cpus": "16",
+  "macos": "ProductName:\t\tmacOS\nProductVersion:\t\t26.6.2\nBuildVersion:\t\t25G83",
+  "memory_bytes": "137438953472",
+  "model": "Mac15,9",
+  "python": "Python 3.9.6",
+  "uv": "uv 0.9.26 (Homebrew 2026-01-15)",
+  "zig_command": "/Users/rs/bin/zig",
+  "zig_resolved": "/Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/zig",
+  "zig_sha256": "e6cd688d25664983833aae272f501d4bceeae304875b8f1741209d15fd13a4ec",
+  "zig_version": "0.16.0"
+}

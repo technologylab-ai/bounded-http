@@ -18,11 +18,14 @@ Open the HTML file in a browser; the document includes every SVG and works offli
 The [independent embedding example](examples/embedding/src/main.zig) demonstrates the complete application lifecycle.
 
 An experimental HTTP/1.1 framework and reference server for **Zig 0.16.0**.
-Linux uses a custom single-shot `io_uring` adapter; macOS uses nonblocking
-sockets with `kqueue`. Application callbacks can run on the I/O owner or on fixed startup workers.
+Linux uses a custom single-shot `io_uring` adapter.
+macOS uses nonblocking sockets with `kqueue`.
+Windows uses overlapped sockets and an I/O completion port (IOCP).
+Application callbacks can run on the I/O owner or on fixed startup workers.
 Inline execution is the default for trusted bounded, nonblocking handlers;
-blocking callbacks must explicitly select fixed startup workers. Windows support is pending and currently produces
-a compile error. This is the M4 implementation informed by the adjacent
+blocking callbacks must explicitly select fixed startup workers.
+The [Windows receipt](reports/2026-09-06-windows-iocp.md) records native x64 evidence and its limits.
+This is the M4 implementation informed by the adjacent
 [Zig LLM Wiki](https://technologylab-ai.github.io/zigllmwiki/?page=wiki/bounded-http-server-design.md).
 
 The first goal is a working ownership and pending/resume model that we can
@@ -42,8 +45,12 @@ zig build -Doptimize=ReleaseSafe
 ./zig-out/bin/bounded-http --port 8080 --connections 128
 ```
 
+On Windows, use `.\zig-out\bin\bounded-http.exe` from PowerShell.
+Windows currently uses one I/O shard.
+
 The version must print `0.16.0`. The server prints `READY` to stderr after
-startup. Use Ctrl-C/SIGINT or SIGTERM to stop it; `--duration-ms 30000` requests
+startup. Linux and macOS accept SIGINT or SIGTERM; Windows consoles accept Ctrl-C or Ctrl-Break.
+`--duration-ms 30000` requests
 shutdown after a finite run. `--port 0` asks the OS for an available loopback
 port, reported in `READY`. The HTML file is loaded before serving starts.
 
@@ -81,7 +88,7 @@ launches its own finite server instances and tests wire framing, fragmentation,
 16-request pipelining, partial sends, flush/resume, overload recovery, worker
 stall separation, request deadlines, slow readers and shutdown ownership. Its
 client deadlines and process watchdogs are test bounds, not latency promises.
-See [evidence inputs](docs/EVIDENCE.md) for source scope. Native Linux and macOS
+See [evidence inputs](docs/EVIDENCE.md) for source scope. Native Linux, macOS, and Windows
 gates establish their own results; cross-compilation never replaces them.
 
 To use the framework, import the `bounded_http` module exported by
@@ -93,7 +100,7 @@ experimental and read the [ownership contract](docs/OWNERSHIP.md) before
 retaining slices or adding asynchronous application work.
 
 The default `./zig-out/bin/bounded-http` uses inline execution, gather sends, up to 128 responses per batch
-and, on Linux, one I/O shard per CPU the process may run on (`--shards N` sets it; macOS runs one).
+and, on Linux, one I/O shard per CPU the process may run on (`--shards N` sets it; macOS and Windows run one).
 `--execution inline` selects it explicitly.
 It provisions **zero application workers** and runs the same handler/writer path
 on the I/O owner. Callbacks and flush resumptions must be short and nonblocking;
@@ -153,7 +160,7 @@ The default startup limits are explicit:
 | Submit batch | 0 (at poll) | `--submit-batch`; submit queued sends after this many drains within a turn; measured no gain on omarx1, kept as an experiment. |
 | Pre-armed receive | off | `--prearm-receive 0|1`; arm the next receive while the batch is still being sent; measured no gain on io_uring and slower on kqueue. |
 | Per-callback timing | off | `--callback-timing 1` records exact queue/handler maxima at two clock reads per callback. |
-| I/O shards | one per allowed CPU (Linux, at most 16), 1 (macOS) | `--shards`; 1–64, inline execution only; each shard reserves full slot storage and a shared counter keeps `--connections` the process-wide ceiling; `--shard-affinity 1` pins shard i to allowed CPU i. |
+| I/O shards | one per allowed CPU (Linux, at most 16), 1 (macOS and Windows) | Linux accepts `--shards` 1–64 with inline execution. Each shard reserves full slot storage. Shared admission preserves the connection ceiling. Linux `--shard-affinity 1` pins each shard to its allowed CPU. |
 | Logical response body | 16 MiB | `--max-response`; counted across flushes. |
 | Request cycle deadline | 5000 ms | `--timeout-ms`; includes receive, worker queue/execution and response sending. |
 | Shutdown drain deadline | 5000 ms | `Config.shutdown_ms`; positive. |
@@ -172,6 +179,11 @@ cell for each, `4 * connections + 2` operation records per shard
 (`shards * (4 * connections + 2)` across the cluster); the optional `--prearm-receive 1` path can arm the next
 receive while the previous batch is still being sent. Admission resumes
 when the old application and transport owners have actually released a slot.
+
+Windows reserves `connections + 1` socket-table entries and one separate listener.
+Each pending accept creates a Winsock socket within that table capacity.
+Provider allocations and delayed TCP cleanup remain outside the framework heap budget.
+The fixed table bounds application-owned handles, rather than every kernel resource retained over time.
 
 The demo caps requested live bytes through its framework allocator at
 `memory_budget_bytes - Cluster.stackBytes(config)`, reserving the requested
@@ -262,6 +274,11 @@ Reproduce all three finite smoke workloads with `python3 tools/smoke.py`. It
 checks the running binary reports ReleaseSafe. For isolated Linux verification
 from the Mac, run `tools/verify_linux_ssh.sh omarx1`; use a clean pushed checkout
 for publication evidence.
+
+The manual [Windows workflow](.github/workflows/windows-runtime-verify.yml) builds and runs native x64 tests on GitHub-hosted Windows.
+Its finite [supervisor](tools/verify_windows.py) captures compiler, operating-system, source, binary, and test evidence.
+Four POSIX suspension fixtures remain explicitly excluded on Windows.
+Windows timings do not qualify comparative performance or physical deployment behavior.
 
 Response batching uses the ordinary handler and writer for every request; there
 is no cached plaintext response path. Each finished response is a range of the

@@ -4,10 +4,11 @@ The server provides bounded HTTP/1.1 processing with explicit ownership of memor
 The current implementation targets exact Zig 0.16.0.
 Linux uses `io_uring`.
 macOS uses nonblocking sockets and `kqueue`.
+Windows uses overlapped sockets and an I/O completion port (IOCP), which delivers operation results to the owner.
 
 The server remains experimental.
 The listener accepts IPv4 loopback connections only.
-The implementation has no Transport Layer Security (TLS), Windows adapter, protocol upgrade, or tunnel support.
+The implementation has no Transport Layer Security (TLS), protocol upgrade, or tunnel support.
 See [using the server](USING.md) for embedding instructions.
 
 ## Terms
@@ -43,7 +44,7 @@ The framework creates no threads during request processing.
 A CPU denotes a logical processor here.
 Linux defaults to one shard per allowed CPU, with a maximum of 16.
 Explicit Linux configurations can select up to 64 shards.
-macOS currently requires one shard.
+macOS and Windows currently require one shard.
 These choices belong to this implementation, rather than the `std.Io` interface contract.
 
 Each Linux shard has a separate listener using `SO_REUSEPORT`.
@@ -77,6 +78,8 @@ The owner publishes exclusive access to request state and output storage before 
 The worker publishes the callback result before the owner processes its output.
 This handoff does not require copying the request payload.
 The owner copies its response header cache into slot storage before worker dispatch.
+Windows workers wait on events created at startup.
+Worker results notify the I/O owner through a completion-port control packet.
 
 A blocked callback delays other slots assigned to that worker.
 Workers share memory and process fate with the owner.
@@ -106,7 +109,7 @@ An embedding application must preserve the ownership boundaries in this sequence
 7. The executable subtracts `Cluster.stackBytes()` from `memory_budget_bytes` to establish the framework heap limit.
 8. The executable constructs `Budget` with that heap limit.
 9. `Cluster.init()` allocates framework storage and initializes listeners and transport adapters.
-10. The executable installs signal handlers that set atomic stop flags.
+10. The executable installs signal or Windows console handlers that set atomic stop flags.
 11. `Cluster.start()` prepares workers and secondary owner threads behind a startup barrier.
 12. The executable seals the framework allocator after startup succeeds.
 13. The executable prints `READY` with the selected configuration and port.
@@ -130,6 +133,8 @@ After a successful run, the demo prints per-shard counters and combined `STATS`.
 The demo serializes those statistics with its startup allocator after request processing ends.
 Deferred cleanup destroys the cluster before freeing application assets.
 The budget check then requires zero remaining framework heap bytes.
+Windows console callbacks can run on separate operating-system threads.
+The executable clears its published cluster pointer and reconciles outstanding handler references before destroying the cluster.
 
 ## Request processing
 
@@ -194,6 +199,7 @@ Adjacent arena ranges become one transport span.
 A batch containing separate borrowed spans uses a vector list.
 The Linux adapter selects `SEND` for one span and `SENDMSG` for multiple spans.
 The macOS adapter uses the corresponding socket operations.
+The Windows adapter submits one or several spans through `WSASend`.
 `send_chunk` limits bytes submitted by one send operation.
 
 Ordinary socket operations still copy data across the kernel boundary.
@@ -215,6 +221,7 @@ Inline execution uses `response_batch_limit`.
 | Arena bytes per slot | `output_bytes` |
 | Response cells across the cluster | `S × C × B` |
 | Operation cells per shard | `4 × C + 2` |
+| Windows socket-table entries | `C + 1`, plus one separate listener handle |
 | Vector capacity for one batch | `2 × B + 1` |
 | Requested startup stack bytes | `worker_stack_bytes × (workers + S − 1)` |
 | Exact requested framework heap bytes | `Cluster.heapBytes(config)` |
@@ -223,6 +230,7 @@ Each slot has receive and send operation cells, plus their separate cancellation
 Each listener adds accept and cancellation cells.
 The cluster also allocates coordinator, shard pointer, thread, and failure arrays.
 `Cluster.heapBytes()` includes these framework allocations.
+Windows accounting also includes its socket table and fixed completion queue.
 
 `Cluster.validate()` rejects configurations whose requested framework heap and startup stacks exceed `memory_budget_bytes`.
 `Budget` separately enforces the requested live framework heap limit during allocation.
@@ -230,13 +238,17 @@ Sealing that allocator rejects subsequent allocation, resize, and remap attempts
 The allocator records those attempts in `late_calls`.
 
 This accounting excludes the caller's existing stack and allocator metadata.
-It also excludes actual stack mappings, pthread metadata, kernel rings, socket queues, application assets, and application allocations.
+It also excludes actual stack mappings, operating-system thread metadata, kernel queues, socket resources, application assets, and application allocations.
 The configured budget therefore does not bound resident process memory.
 The application must account for those additional resources separately.
 
 Admission limits active connection slots rather than the kernel's connection backlog.
 A shard can transiently accept an extra socket before rejecting admission.
 The owner then closes that socket without allocating another slot.
+Windows prepares a socket for each pending accept within its fixed table capacity.
+Winsock creates that kernel resource during admission; framework heap sealing does not intercept provider or kernel allocations.
+Closing a socket releases the framework's handle ownership before Windows necessarily finishes background TCP cleanup.
+The socket-table limit therefore does not bound all provider resources retained over time.
 This refusal does not promise an HTTP 503 response.
 Admission resumes after existing slots release every application and transport borrow.
 
@@ -252,9 +264,24 @@ An operation that cannot progress registers for `kqueue` readiness.
 Readiness permits another attempt; it does not release the operation's buffers.
 The adapter reports completion after the socket operation terminates.
 
+The [Windows adapter](../src/transport_windows.zig) uses one completion port and stable, preallocated operation records.
+Each record contains `OVERLAPPED`, the Windows structure that identifies an asynchronous operation.
+`AcceptEx` accepts without waiting for initial request bytes.
+`WSARecv` receives into slot storage; `WSASend` transmits retained response spans.
+Immediate success still produces a completion packet under the selected notification mode.
+The adapter retains each operation until that packet arrives.
+Each dequeue retrieves at most 256 entries.
+The adapter checks each operation's result separately because one successful dequeue can contain failed operations.
+The adapter converts caller vectors into a fixed `WSABUF` array during submission.
+Winsock captures those descriptors; response payloads remain borrowed until completion.
+Windows uses exclusive listener binding and rejects multiple shards.
+
 A cancellation acknowledgement and the cancelled operation's completion are separate events.
 The server retains storage until both relevant events settle.
 Closing a descriptor does not substitute for that ownership accounting.
+On Windows, `CancelIoEx` requests cancellation without ending the target's lifetime.
+The adapter reports its cancellation acknowledgement separately from the target's terminal packet.
+Shutdown drains both records before releasing sockets, events, the completion port, or payload storage.
 
 The default owner checks touched connections during processing.
 It also sweeps all connection deadlines every 100 milliseconds.
@@ -300,6 +327,7 @@ The framework cannot safely kill one arbitrary callback and reuse its borrowed m
 | [transport.zig](../src/transport.zig) | Platform selection, common operation types, and listener setup. |
 | [transport_linux.zig](../src/transport_linux.zig) | Linux completion adapter. |
 | [transport_macos.zig](../src/transport_macos.zig) | macOS readiness adapter with explicit completion reports. |
+| [transport_windows.zig](../src/transport_windows.zig) | Windows overlapped socket adapter with bounded IOCP records and cancellation drain. |
 | [build.zig](../build.zig) | Exported module, executable, exact compiler check, and verification steps. |
 
 Continue with [using the server](USING.md) for the application contract.

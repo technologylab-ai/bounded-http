@@ -1,0 +1,5 @@
+bounded-http: bounded experimental Linux io_uring / macOS kqueue / Windows IOCP HTTP/1.1
+--port N --connections N --execution workers|inline --workers N --max-body N --max-header N
+--timeout-ms N --duration-ms N --send-chunk N --gather-send 0|1 --stall-ms N
+--response-batch-limit N --socket-send-buffer N --output-bytes N --max-response N --memory-budget N --index FILE
+--borrow-copy-threshold N --callbacks-per-turn N --callback-timing 0|1 --deadline-sweep-ms N --shards N

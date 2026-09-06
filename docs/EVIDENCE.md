@@ -13,6 +13,16 @@ OS and design inputs already pinned in the wiki before implementation:
   for single-shot submission, terminal completions and separate cancellation.
 - [Apple kqueue manual](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/man/man2/kqueue.2)
   for readiness, one-shot registrations and filters.
+- [Microsoft AcceptEx contract](https://github.com/MicrosoftDocs/sdk-api/blob/5f2625b6782d3e9c0df08756583c527a0a2872ca/sdk-api-src/content/mswsock/nf-mswsock-acceptex.md)
+  for zero-data asynchronous accept and accepted-socket context updates.
+- [Microsoft overlapped socket contract](https://github.com/MicrosoftDocs/sdk-api/blob/5f2625b6782d3e9c0df08756583c527a0a2872ca/sdk-api-src/content/winsock2/nf-winsock2-wsasend.md)
+  for descriptor capture and payload lifetime.
+- [Microsoft batched completion contract](https://github.com/MicrosoftDocs/sdk-api/blob/5f2625b6782d3e9c0df08756583c527a0a2872ca/sdk-api-src/content/ioapiset/nf-ioapiset-getqueuedcompletionstatusex.md)
+  for bounded dequeue arrays and separate per-operation errors.
+- [Microsoft cancellation contract](https://github.com/MicrosoftDocs/sdk-api/blob/5f2625b6782d3e9c0df08756583c527a0a2872ca/sdk-api-src/content/ioapiset/nf-ioapiset-cancelioex.md)
+  for cancellation requests that leave operation ownership outstanding.
+- [Microsoft socket-close contract](https://github.com/MicrosoftDocs/sdk-api/blob/5f2625b6782d3e9c0df08756583c527a0a2872ca/sdk-api-src/content/winsock/nf-winsock-closesocket.md)
+  for terminal ownership and provider resources retained during background close.
 - [TigerStyle](https://github.com/tigerbeetle/tigerbeetle/blob/47aeb2212a255273dda508288412e537d11e4b7c/docs/TIGER_STYLE.md)
   for explicit limits, startup allocation, checked arithmetic and ownership assertions.
 - [TechEmpower plaintext driver](https://github.com/TechEmpower/FrameworkBenchmarks/blob/57d92fbec6f8fd7431bc77326dd0484e60c96e20/toolset/test_types/plaintext/plaintext.py)

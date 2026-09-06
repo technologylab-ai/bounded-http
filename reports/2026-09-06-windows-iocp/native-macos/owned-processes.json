@@ -1,0 +1,554 @@
+[
+  {
+    "command": "/Users/rs/bin/zig build verify --summary all",
+    "executable": "/Users/rs/bin/zi",
+    "pgid": 92798,
+    "pid": 92798,
+    "ppid": 92768,
+    "start": "Sun Sep 6 16:40:27 2026"
+  },
+  {
+    "command": ".zig-cache/o/ebbf5e25be1d7dd92f47fc537ce290fc/build /Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/zig /Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/lib /Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot .zig-cache /Users/rs/.cache/zig --seed 0x12837546 -Z565f84c998e003c7 verify --summary all",
+    "executable": ".zig-cache/o/ebb",
+    "pgid": 92798,
+    "pid": 92844,
+    "ppid": 92798,
+    "start": "Sun Sep 6 16:40:30 2026"
+  },
+  {
+    "command": "(xcrun)",
+    "executable": "(xcrun)",
+    "pgid": 92798,
+    "pid": 92867,
+    "ppid": 92855,
+    "start": "Sun Sep 6 16:40:30 2026"
+  },
+  {
+    "command": "(xcrun)",
+    "executable": "(xcrun)",
+    "pgid": 92798,
+    "pid": 92868,
+    "ppid": 92854,
+    "start": "Sun Sep 6 16:40:30 2026"
+  },
+  {
+    "command": "(xcrun)",
+    "executable": "(xcrun)",
+    "pgid": 92798,
+    "pid": 92869,
+    "ppid": 92853,
+    "start": "Sun Sep 6 16:40:30 2026"
+  },
+  {
+    "command": "/Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/zig test -ODebug -Mroot=/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/src/server.zig -lc --cache-dir .zig-cache --global-cache-dir /Users/rs/.cache/zig --name test --zig-lib-dir /Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/lib/ --listen=-",
+    "executable": "/Users/rs/renero",
+    "pgid": 92798,
+    "pid": 92849,
+    "ppid": 92844,
+    "start": "Sun Sep 6 16:40:30 2026"
+  },
+  {
+    "command": "/Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/zig test -ODebug -Mroot=/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/src/api.zig -lc --cache-dir .zig-cache --global-cache-dir /Users/rs/.cache/zig --name test --zig-lib-dir /Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/lib/ --listen=-",
+    "executable": "/Users/rs/renero",
+    "pgid": 92798,
+    "pid": 92850,
+    "ppid": 92844,
+    "start": "Sun Sep 6 16:40:30 2026"
+  },
+  {
+    "command": "/Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/zig test -ODebug -Mroot=/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/src/transport.zig -lc --cache-dir .zig-cache --global-cache-dir /Users/rs/.cache/zig --name test --zig-lib-dir /Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/lib/ --listen=-",
+    "executable": "/Users/rs/renero",
+    "pgid": 92798,
+    "pid": 92851,
+    "ppid": 92844,
+    "start": "Sun Sep 6 16:40:30 2026"
+  },
+  {
+    "command": "/Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/zig build-exe -ODebug --dep bounded_http -Mroot=/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/src/main.zig -ODebug -Mbounded_http=/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/src/server.zig -lc --cache-dir .zig-cache --global-cache-dir /Users/rs/.cache/zig --name bounded-http --zig-lib-dir /Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/lib/ --listen=-",
+    "executable": "/Users/rs/renero",
+    "pgid": 92798,
+    "pid": 92852,
+    "ppid": 92844,
+    "start": "Sun Sep 6 16:40:30 2026"
+  },
+  {
+    "command": "/Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/zig build -Doptimize=Debug --prefix /Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/.zig-cache/embedding-Debug",
+    "executable": "/Users/rs/renero",
+    "pgid": 92798,
+    "pid": 92853,
+    "ppid": 92844,
+    "start": "Sun Sep 6 16:40:30 2026"
+  },
+  {
+    "command": "/Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/zig test -ODebug -Mroot=/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/src/http.zig -lc --cache-dir .zig-cache --global-cache-dir /Users/rs/.cache/zig --name test --zig-lib-dir /Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/lib/ --listen=-",
+    "executable": "/Users/rs/renero",
+    "pgid": 92798,
+    "pid": 92854,
+    "ppid": 92844,
+    "start": "Sun Sep 6 16:40:30 2026"
+  },
+  {
+    "command": "(zig)",
+    "executable": "(zig)",
+    "pgid": 92798,
+    "pid": 92855,
+    "ppid": 92844,
+    "start": "Sun Sep 6 16:40:30 2026"
+  },
+  {
+    "command": "./.zig-cache/o/9eee43ad9ef5793ccc1ffacc02b2b50a/test --cache-dir=./.zig-cache --seed=0x12837546 --listen=-",
+    "executable": "./.zig-cache/o/9",
+    "pgid": 92798,
+    "pid": 92898,
+    "ppid": 92844,
+    "start": "Sun Sep 6 16:40:32 2026"
+  },
+  {
+    "command": "./.zig-cache/o/0a479843a3dd30db7e30e6b4bec6e1f8/test --cache-dir=./.zig-cache --seed=0x12837546 --listen=-",
+    "executable": "./.zig-cache/o/0",
+    "pgid": 92798,
+    "pid": 92900,
+    "ppid": 92844,
+    "start": "Sun Sep 6 16:40:32 2026"
+  },
+  {
+    "command": "./.zig-cache/o/7f3e577c32471c0e2a4bae8b3de0d968/test --cache-dir=./.zig-cache --seed=0x12837546 --listen=-",
+    "executable": "./.zig-cache/o/7",
+    "pgid": 92798,
+    "pid": 92901,
+    "ppid": 92844,
+    "start": "Sun Sep 6 16:40:32 2026"
+  },
+  {
+    "command": "./.zig-cache/o/1ff36b4bd0b230e70406418045a70887/test --cache-dir=./.zig-cache --seed=0x12837546 --listen=-",
+    "executable": "./.zig-cache/o/1",
+    "pgid": 92798,
+    "pid": 92892,
+    "ppid": 92844,
+    "start": "Sun Sep 6 16:40:32 2026"
+  },
+  {
+    "command": "(test)",
+    "executable": "(test)",
+    "pgid": 92798,
+    "pid": 92903,
+    "ppid": 92844,
+    "start": "Sun Sep 6 16:40:32 2026"
+  },
+  {
+    "command": ".zig-cache/o/5fe59fd860fa1e0a5a3ffdfbcfa204fe/build /Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/zig /Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/lib /Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/examples/embedding .zig-cache /Users/rs/.cache/zig --seed 0xfa8198d4 -Ze2d207dc2d587399 -Doptimize=Debug --prefix /Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/.zig-cache/embedding-Debug",
+    "executable": ".zig-cache/o/5fe",
+    "pgid": 92798,
+    "pid": 92921,
+    "ppid": 92853,
+    "start": "Sun Sep 6 16:40:34 2026"
+  },
+  {
+    "command": "/Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/zig build-exe -ODebug --dep bounded_http -Mroot=/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/examples/embedding/src/main.zig -ODebug -Mbounded_http=/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/src/server.zig -lc --cache-dir .zig-cache --global-cache-dir /Users/rs/.cache/zig --name embedded-http --zig-lib-dir /Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/lib/ --listen=-",
+    "executable": "/Users/rs/renero",
+    "pgid": 92798,
+    "pid": 92936,
+    "ppid": 92921,
+    "start": "Sun Sep 6 16:40:34 2026"
+  },
+  {
+    "command": "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python tools/check_embedding.py --binary /Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/.zig-cache/embedding-Debug/bin/embedded-http",
+    "executable": "/Applications/Xc",
+    "pgid": 92798,
+    "pid": 92955,
+    "ppid": 92844,
+    "start": "Sun Sep 6 16:40:36 2026"
+  },
+  {
+    "command": "(embedded-http)",
+    "executable": "(embedded-http)",
+    "pgid": 92957,
+    "pid": 92957,
+    "ppid": 92955,
+    "start": "Sun Sep 6 16:40:36 2026"
+  },
+  {
+    "command": "(zig)",
+    "executable": "(zig)",
+    "pgid": 92977,
+    "pid": 92977,
+    "ppid": 92768,
+    "start": "Sun Sep 6 16:40:38 2026"
+  },
+  {
+    "command": "/Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/zig build -Doptimize=ReleaseSafe --prefix /Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/.zig-cache/embedding-ReleaseSafe",
+    "executable": "/Users/rs/renero",
+    "pgid": 92977,
+    "pid": 93004,
+    "ppid": 92982,
+    "start": "Sun Sep 6 16:40:38 2026"
+  },
+  {
+    "command": "(build)",
+    "executable": "(build)",
+    "pgid": 92977,
+    "pid": 92982,
+    "ppid": 92977,
+    "start": "Sun Sep 6 16:40:38 2026"
+  },
+  {
+    "command": "/Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/zig test -OReleaseSafe -Mroot=/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/src/budget.zig -lc --cache-dir .zig-cache --global-cache-dir /Users/rs/.cache/zig --name test --zig-lib-dir /Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/lib/ --listen=-",
+    "executable": "/Users/rs/renero",
+    "pgid": 92977,
+    "pid": 92983,
+    "ppid": 92982,
+    "start": "Sun Sep 6 16:40:38 2026"
+  },
+  {
+    "command": "/Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/zig test -OReleaseSafe -Mroot=/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/src/http.zig -lc --cache-dir .zig-cache --global-cache-dir /Users/rs/.cache/zig --name test --zig-lib-dir /Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/lib/ --listen=-",
+    "executable": "/Users/rs/renero",
+    "pgid": 92977,
+    "pid": 92985,
+    "ppid": 92982,
+    "start": "Sun Sep 6 16:40:38 2026"
+  },
+  {
+    "command": "/Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/zig build-exe -OReleaseSafe --dep bounded_http -Mroot=/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/src/main.zig -OReleaseSafe -Mbounded_http=/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/src/server.zig -lc --cache-dir .zig-cache --global-cache-dir /Users/rs/.cache/zig --name bounded-http --zig-lib-dir /Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/lib/ --listen=-",
+    "executable": "/Users/rs/renero",
+    "pgid": 92977,
+    "pid": 92986,
+    "ppid": 92982,
+    "start": "Sun Sep 6 16:40:38 2026"
+  },
+  {
+    "command": "(zig)",
+    "executable": "(zig)",
+    "pgid": 92977,
+    "pid": 92987,
+    "ppid": 92982,
+    "start": "Sun Sep 6 16:40:38 2026"
+  },
+  {
+    "command": "/Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/zig test -OReleaseSafe -Mroot=/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/src/api.zig -lc --cache-dir .zig-cache --global-cache-dir /Users/rs/.cache/zig --name test --zig-lib-dir /Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/lib/ --listen=-",
+    "executable": "/Users/rs/renero",
+    "pgid": 92977,
+    "pid": 92988,
+    "ppid": 92982,
+    "start": "Sun Sep 6 16:40:38 2026"
+  },
+  {
+    "command": "/Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/zig test -OReleaseSafe -Mroot=/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/src/transport.zig -lc --cache-dir .zig-cache --global-cache-dir /Users/rs/.cache/zig --name test --zig-lib-dir /Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/lib/ --listen=-",
+    "executable": "/Users/rs/renero",
+    "pgid": 92977,
+    "pid": 92990,
+    "ppid": 92982,
+    "start": "Sun Sep 6 16:40:38 2026"
+  },
+  {
+    "command": ".zig-cache/o/5fe59fd860fa1e0a5a3ffdfbcfa204fe/build /Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/zig /Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/lib /Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/examples/embedding .zig-cache /Users/rs/.cache/zig --seed 0xda4a0794 -Za91f4e994a6ae84d -Doptimize=ReleaseSafe --prefix /Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/.zig-cache/embedding-ReleaseSafe",
+    "executable": ".zig-cache/o/5fe",
+    "pgid": 92977,
+    "pid": 93008,
+    "ppid": 93004,
+    "start": "Sun Sep 6 16:40:38 2026"
+  },
+  {
+    "command": "/Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/zig build-exe -OReleaseSafe --dep bounded_http -Mroot=/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/examples/embedding/src/main.zig -OReleaseSafe -Mbounded_http=/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/src/server.zig -lc --cache-dir .zig-cache --global-cache-dir /Users/rs/.cache/zig --name embedded-http --zig-lib-dir /Users/rs/renerocksai.stow/nvim/.local/share/zigup/0.16.0/files/lib/ --listen=-",
+    "executable": "/Users/rs/renero",
+    "pgid": 92977,
+    "pid": 93009,
+    "ppid": 93008,
+    "start": "Sun Sep 6 16:40:38 2026"
+  },
+  {
+    "command": "(test)",
+    "executable": "(test)",
+    "pgid": 92977,
+    "pid": 93063,
+    "ppid": 92982,
+    "start": "Sun Sep 6 16:40:43 2026"
+  },
+  {
+    "command": "./.zig-cache/o/3455aee31bcbd9cc4400ab7da5309137/test --cache-dir=./.zig-cache --seed=0x6a79a9c --listen=-",
+    "executable": "./.zig-cache/o/3",
+    "pgid": 92977,
+    "pid": 93065,
+    "ppid": 92982,
+    "start": "Sun Sep 6 16:40:43 2026"
+  },
+  {
+    "command": "./.zig-cache/o/06bf9692c4ff8d659782e92e2c77f4d7/test --cache-dir=./.zig-cache --seed=0x6a79a9c --listen=-",
+    "executable": "./.zig-cache/o/0",
+    "pgid": 92977,
+    "pid": 93067,
+    "ppid": 92982,
+    "start": "Sun Sep 6 16:40:43 2026"
+  },
+  {
+    "command": "./.zig-cache/o/18e55fe65c6482e0cbfd63daa2897802/test --cache-dir=./.zig-cache --seed=0x6a79a9c --listen=-",
+    "executable": "./.zig-cache/o/1",
+    "pgid": 92977,
+    "pid": 93068,
+    "ppid": 92982,
+    "start": "Sun Sep 6 16:40:43 2026"
+  },
+  {
+    "command": "./.zig-cache/o/124d989c820473f3e62ca5b0c495d6da/test --cache-dir=./.zig-cache --seed=0x6a79a9c --listen=-",
+    "executable": "./.zig-cache/o/1",
+    "pgid": 92977,
+    "pid": 93078,
+    "ppid": 92982,
+    "start": "Sun Sep 6 16:40:44 2026"
+  },
+  {
+    "command": "(Python)",
+    "executable": "(Python)",
+    "pgid": 92977,
+    "pid": 93083,
+    "ppid": 92982,
+    "start": "Sun Sep 6 16:40:45 2026"
+  },
+  {
+    "command": "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/.zig-cache/embedding-ReleaseSafe/bin/embedded-http --port 0 --duration-ms 1500",
+    "executable": "/Users/rs/code/g",
+    "pgid": 93084,
+    "pid": 93084,
+    "ppid": 93083,
+    "start": "Sun Sep 6 16:40:45 2026"
+  },
+  {
+    "command": "/Users/rs/bin/zig build -Doptimize=ReleaseSafe",
+    "executable": "/Users/rs/bin/zi",
+    "pgid": 93118,
+    "pid": 93118,
+    "ppid": 92768,
+    "start": "Sun Sep 6 16:40:47 2026"
+  },
+  {
+    "command": "(bounded-http)",
+    "executable": "(bounded-http)",
+    "pgid": 93129,
+    "pid": 93129,
+    "ppid": 92768,
+    "start": "Sun Sep 6 16:40:47 2026"
+  },
+  {
+    "command": "(Python)",
+    "executable": "(Python)",
+    "pgid": 93137,
+    "pid": 93137,
+    "ppid": 92768,
+    "start": "Sun Sep 6 16:40:48 2026"
+  },
+  {
+    "command": "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python tests/arena_lifecycle_integration.py --json /Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/macos/arena_lifecycle-integration.json",
+    "executable": "/Applications/Xc",
+    "pgid": 93141,
+    "pid": 93141,
+    "ppid": 92768,
+    "start": "Sun Sep 6 16:40:48 2026"
+  },
+  {
+    "command": "(bounded-http)",
+    "executable": "(bounded-http)",
+    "pgid": 93145,
+    "pid": 93145,
+    "ppid": 93141,
+    "start": "Sun Sep 6 16:40:48 2026"
+  },
+  {
+    "command": "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python tests/batch_integration.py --json /Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/macos/batch-integration.json",
+    "executable": "/Applications/Xc",
+    "pgid": 93154,
+    "pid": 93154,
+    "ppid": 92768,
+    "start": "Sun Sep 6 16:40:48 2026"
+  },
+  {
+    "command": "(bounded-http)",
+    "executable": "(bounded-http)",
+    "pgid": 93159,
+    "pid": 93159,
+    "ppid": 93154,
+    "start": "Sun Sep 6 16:40:48 2026"
+  },
+  {
+    "command": "(bounded-http)",
+    "executable": "(bounded-http)",
+    "pgid": 93165,
+    "pid": 93165,
+    "ppid": 93154,
+    "start": "Sun Sep 6 16:40:49 2026"
+  },
+  {
+    "command": "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/zig-out/bin/bounded-http --execution inline --port 0 --connections 2 --workers 0 --max-body 1024 --max-header 2048 --timeout-ms 1000 --stall-ms 1000 --send-chunk 65536 --index /var/folders/8k/lw4m3ycs4gz4xmzp72v2g45m0000gn/T/bounded-http-batch-cancel-rsh0u0gj/index.html --socket-send-buffer 4096 --response-batch-limit 16",
+    "executable": "/Users/rs/code/g",
+    "pgid": 93188,
+    "pid": 93188,
+    "ppid": 93154,
+    "start": "Sun Sep 6 16:40:49 2026"
+  },
+  {
+    "command": "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/zig-out/bin/bounded-http --execution inline --port 0 --connections 8 --workers 0 --max-body 2097152 --max-header 2048 --timeout-ms 1000 --stall-ms 1000 --send-chunk 65536 --socket-send-buffer 4096 --prearm-receive 0 --submit-batch 0 --response-batch-limit 16",
+    "executable": "/Users/rs/code/g",
+    "pgid": 93199,
+    "pid": 93199,
+    "ppid": 93154,
+    "start": "Sun Sep 6 16:40:50 2026"
+  },
+  {
+    "command": "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/zig-out/bin/bounded-http --execution inline --port 0 --connections 8 --workers 0 --max-body 2097152 --max-header 2048 --timeout-ms 1000 --stall-ms 1000 --send-chunk 65536 --socket-send-buffer 4096 --prearm-receive 1 --submit-batch 1 --response-batch-limit 16",
+    "executable": "/Users/rs/code/g",
+    "pgid": 93210,
+    "pid": 93210,
+    "ppid": 93154,
+    "start": "Sun Sep 6 16:40:51 2026"
+  },
+  {
+    "command": "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python tests/gather_integration.py --json /Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/macos/gather-integration.json",
+    "executable": "/Applications/Xc",
+    "pgid": 93450,
+    "pid": 93450,
+    "ppid": 92768,
+    "start": "Sun Sep 6 16:40:53 2026"
+  },
+  {
+    "command": "(bounded-http)",
+    "executable": "(bounded-http)",
+    "pgid": 93454,
+    "pid": 93454,
+    "ppid": 93450,
+    "start": "Sun Sep 6 16:40:53 2026"
+  },
+  {
+    "command": "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/zig-out/bin/bounded-http --execution inline --port 0 --connections 4 --workers 0 --max-body 2097152 --max-header 2048 --timeout-ms 1000 --stall-ms 1000 --send-chunk 65536 --response-batch-limit 1 --gather-send 1 --socket-send-buffer 4096",
+    "executable": "/Users/rs/code/g",
+    "pgid": 93464,
+    "pid": 93464,
+    "ppid": 93450,
+    "start": "Sun Sep 6 16:40:53 2026"
+  },
+  {
+    "command": "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python tests/inline_integration.py --json /Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/macos/inline-integration.json",
+    "executable": "/Applications/Xc",
+    "pgid": 93489,
+    "pid": 93489,
+    "ppid": 92768,
+    "start": "Sun Sep 6 16:40:54 2026"
+  },
+  {
+    "command": "(bounded-http)",
+    "executable": "(bounded-http)",
+    "pgid": 93497,
+    "pid": 93497,
+    "ppid": 93489,
+    "start": "Sun Sep 6 16:40:54 2026"
+  },
+  {
+    "command": "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python tests/integration.py --json /Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/macos/integration.json",
+    "executable": "/Applications/Xc",
+    "pgid": 93505,
+    "pid": 93505,
+    "ppid": 92768,
+    "start": "Sun Sep 6 16:40:55 2026"
+  },
+  {
+    "command": "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/zig-out/bin/bounded-http --execution workers --port 0 --connections 16 --workers 2 --max-body 1024 --max-header 2048 --timeout-ms 3000 --stall-ms 1000 --send-chunk 7",
+    "executable": "/Users/rs/code/g",
+    "pgid": 93507,
+    "pid": 93507,
+    "ppid": 93505,
+    "start": "Sun Sep 6 16:40:55 2026"
+  },
+  {
+    "command": "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/zig-out/bin/bounded-http --execution workers --port 0 --connections 2 --workers 2 --max-body 1024 --max-header 2048 --timeout-ms 2000 --stall-ms 1000 --send-chunk 65536",
+    "executable": "/Users/rs/code/g",
+    "pgid": 93517,
+    "pid": 93517,
+    "ppid": 93505,
+    "start": "Sun Sep 6 16:40:56 2026"
+  },
+  {
+    "command": "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/zig-out/bin/bounded-http --execution workers --port 0 --connections 4 --workers 2 --max-body 1024 --max-header 2048 --timeout-ms 2000 --stall-ms 1000 --send-chunk 65536",
+    "executable": "/Users/rs/code/g",
+    "pgid": 93519,
+    "pid": 93519,
+    "ppid": 93505,
+    "start": "Sun Sep 6 16:40:56 2026"
+  },
+  {
+    "command": "(bounded-http)",
+    "executable": "(bounded-http)",
+    "pgid": 93523,
+    "pid": 93523,
+    "ppid": 93505,
+    "start": "Sun Sep 6 16:40:57 2026"
+  },
+  {
+    "command": "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/zig-out/bin/bounded-http --execution workers --port 0 --connections 4 --workers 2 --max-body 2097152 --max-header 2048 --timeout-ms 1000 --stall-ms 1000 --send-chunk 65536 --socket-send-buffer 4096",
+    "executable": "/Users/rs/code/g",
+    "pgid": 93531,
+    "pid": 93531,
+    "ppid": 93505,
+    "start": "Sun Sep 6 16:40:58 2026"
+  },
+  {
+    "command": "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/zig-out/bin/bounded-http --execution workers --port 0 --connections 4 --workers 2 --max-body 1024 --max-header 2048 --timeout-ms 3000 --stall-ms 300 --send-chunk 1",
+    "executable": "/Users/rs/code/g",
+    "pgid": 93545,
+    "pid": 93545,
+    "ppid": 93505,
+    "start": "Sun Sep 6 16:40:59 2026"
+  },
+  {
+    "command": "(python3.9)",
+    "executable": "(python3.9)",
+    "pgid": 93549,
+    "pid": 93549,
+    "ppid": 92768,
+    "start": "Sun Sep 6 16:40:59 2026"
+  },
+  {
+    "command": "(Python)",
+    "executable": "(Python)",
+    "pgid": 93553,
+    "pid": 93553,
+    "ppid": 92768,
+    "start": "Sun Sep 6 16:40:59 2026"
+  },
+  {
+    "command": "(file)",
+    "executable": "(file)",
+    "pgid": 93553,
+    "pid": 93560,
+    "ppid": 93553,
+    "start": "Sun Sep 6 16:40:59 2026"
+  },
+  {
+    "command": "(bounded-http)",
+    "executable": "(bounded-http)",
+    "pgid": 93563,
+    "pid": 93563,
+    "ppid": 93553,
+    "start": "Sun Sep 6 16:40:59 2026"
+  },
+  {
+    "command": "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python /Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/tools/benchmark.py http://127.0.0.1:54305/plaintext --connections 8 --requests 10000 --pipeline 1 --timeout 5 --deadline 38",
+    "executable": "/Applications/Xc",
+    "pgid": 93553,
+    "pid": 93564,
+    "ppid": 93553,
+    "start": "Sun Sep 6 16:40:59 2026"
+  },
+  {
+    "command": "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python /Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/tools/benchmark.py http://127.0.0.1:54305/plaintext --connections 8 --requests 10000 --pipeline 16 --timeout 5 --deadline 38",
+    "executable": "/Applications/Xc",
+    "pgid": 93553,
+    "pid": 93572,
+    "ppid": 93553,
+    "start": "Sun Sep 6 16:41:00 2026"
+  },
+  {
+    "command": "(Python)",
+    "executable": "(Python)",
+    "pgid": 93553,
+    "pid": 93576,
+    "ppid": 93553,
+    "start": "Sun Sep 6 16:41:00 2026"
+  }
+]

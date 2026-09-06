@@ -1,0 +1,11 @@
+{
+  "linux_owner_metadata_note": "The owner record copied an obsolete descriptive work_root path from the controller template. Its token, PID, start ticks, host, purpose and candidate commit were correct. The controller actually executed the maintained wrapper from the clean detached snapshot recorded below. The correction attempt found that the owner had already released its lock; original evidence was preserved unchanged.",
+  "actual_source_worktree": "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot",
+  "revision": "70f9ae5917076b664081db59c62edc4959ca5041",
+  "source_authorities": [
+    "linux/controller.py",
+    "linux/receipt.json",
+    "linux/gates.log"
+  ],
+  "macos_preflight_note": "A reused controller initially retained an obsolete expected-commit constant and rejected the correct candidate before compiling. That attempt released its reservation. The separate macos-preflight-mismatch packet preserves it; the subsequent macos packet contains the successful full gate."
+}

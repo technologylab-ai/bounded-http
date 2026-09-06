@@ -2,8 +2,8 @@
 
 Use the exported `bounded_http` module to embed the framework in a Zig application.
 Use exact Zig 0.16.0, as specified by [.zig-version](../.zig-version).
-The framework supports Linux and macOS native execution.
-Windows support remains pending.
+The framework has Linux, macOS, and Windows transport adapters.
+The [Windows receipt](../reports/2026-09-06-windows-iocp.md) records native verification and its exclusions.
 
 The current listener accepts plain HTTP/1.1 on IPv4 loopback only.
 The framework has no Transport Layer Security (TLS), general file server, protocol upgrade, or tunnel implementation.
@@ -29,12 +29,23 @@ ReleaseSafe preserves assertions and runtime safety checks.
 The project also supports Debug.
 The build rejects ReleaseFast and ReleaseSmall.
 
+On Windows, run the executable from PowerShell:
+
+```powershell
+.\zig-out\bin\bounded-http.exe --port 8080 --connections 128 --shards 1
+```
+
+Windows currently requires one shard.
+Use native x64 Zig 0.16.0 for the maintained Windows gate.
+
 The server prints `READY` to stderr after preparing its resources.
 Request `/plaintext` for the fixed 13-byte `Hello, World!` response.
 Request `/index.html` for the HTML asset loaded during startup.
 The [README](../README.md) lists the other demonstration routes.
 
-SIGINT and SIGTERM request shutdown in the reference executable.
+SIGINT and SIGTERM request shutdown on Linux and macOS.
+Ctrl-C and Ctrl-Break request shutdown in a Windows console.
+Console closure, logoff, and Windows service controls require separate application integration.
 Use `--duration-ms 30000` for a finite experiment.
 Use `--port 0` to let the operating system choose an available port.
 Read the selected port from `READY`.
@@ -342,7 +353,7 @@ Worker execution currently requires one shard.
 
 Automatic inline callback limits use connections multiplied by the effective batch limit, capped at 8192.
 Automatic Linux shards use the allowed CPU count, capped at 16.
-Automatic macOS and worker configurations use one shard.
+Automatic macOS, Windows, and worker configurations use one shard.
 Each shard reserves the full configured connection capacity.
 More shards therefore increase framework heap requirements despite the shared admission ceiling.
 
@@ -368,6 +379,8 @@ Use `cluster.requestStopFromSignal()` for an atomic-only signal stop request.
 The helper performs no wake, allocation, logging, or other system call.
 Existing polling and callback-progress limits still apply.
 Do not introduce logging, allocation, or ordinary shutdown calls into that signal handler.
+Windows console handlers run on operating-system threads.
+Keep the cluster alive until every handler reference has ended, as the reference executable demonstrates.
 
 Collect `cluster.stats()` after `run()` returns and owner threads have stopped.
 The current API does not provide synchronized live snapshots of all counters.
@@ -391,10 +404,15 @@ The [Linux verification wrapper](../tools/verify_linux_ssh.sh) runs maintained n
 That wrapper does not acquire the host reservation for its caller.
 Native results apply to their recorded platform and exact source revision.
 Cross-compilation does not establish runtime behavior.
+The manual [Windows workflow](../.github/workflows/windows-runtime-verify.yml) runs native x64 correctness gates on GitHub-hosted Windows.
+Its [supervisor](../tools/verify_windows.py) applies finite process watchdogs and captures evidence even after failure.
+The Windows suite explicitly skips four fixtures that require POSIX process suspension.
+CPU accounting fields remain `null` where the Windows client cannot measure them.
 
 | Tool or suite | Purpose |
 | --- | --- |
 | `zig build verify` | Check the compiler version, formatting, executable, and registered Zig tests. |
+| `zig build check -Dtarget=x86_64-windows -Doptimize=ReleaseSafe` | Cross-compile the Windows executable and Zig tests without running them. |
 | [integration suites](../tests) | Exercise framing, bounds, partial progress, batches, cancellation, and shutdown. |
 | [smoke.py](../tools/smoke.py) | Run a finite verified request smoke experiment. |
 | [benchmark.py](../tools/benchmark.py) | Check response bodies while measuring a supplied endpoint. |

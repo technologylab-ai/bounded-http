@@ -1,0 +1,14 @@
+{
+  "status": "acquired",
+  "owner": {
+    "schema": 1,
+    "token": "b40b12dc1712458d8ac663cfdb20c50b",
+    "host": "omarx1",
+    "owner": "Codex /root/arena_parser_review",
+    "purpose": "Exact Zig0.16.0 clean pushed Windows candidate70f9ae5 Linux regression gate; no timed comparison",
+    "created_utc": "2026-09-06T14:41:38.754396+00:00",
+    "owner_pid": 1721076,
+    "owner_start_ticks": "54963173",
+    "work_root": "/Users/rs/code/github.com/technologylab.ai/zig-http-arena-integration streamed to validated remote /tmp/bounded-http.*"
+  }
+}

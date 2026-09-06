@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'docs/**'
+      - 'reports/2026-09-06-windows-iocp.md'
       - 'tools/build_pages.py'
       - 'tools/render_whitepaper.py'
       - 'tools/check_docs.py'

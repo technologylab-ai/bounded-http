@@ -22,7 +22,7 @@
 <aside class="rail" aria-label="Document navigation">
 <div class="brand">bounded/http<small>ENGINEERING PAPER 01</small></div>
 <nav><a href="#principles"><span>01</span> Design principles</a><a href="#startup"><span>02</span> Inside main.zig</a><a href="#cluster"><span>03</span> Cluster and ownership</a><a href="#request"><span>04</span> Request and response</a><a href="#performance"><span>05</span> Less work per response</a><a href="#evidence"><span>06</span> Measured results</a><a href="#embedding"><span>07</span> Use the framework</a><a href="#limits"><span>08</span> Failure and scope</a><a href="#references"><span>09</span> Sources</a></nav>
-<div class="rail-footer">ZIG 0.16.0<br>LINUX + MACOS<br>EXPERIMENTAL FRAMEWORK<a href="read.html?file=docs/ARCHITECTURE.md">Architecture guide ↗</a><a href="read.html?file=docs/USING.md">Integration guide ↗</a></div>
+<div class="rail-footer">ZIG 0.16.0<br>LINUX + MACOS + WINDOWS<br>EXPERIMENTAL FRAMEWORK<a href="read.html?file=docs/ARCHITECTURE.md">Architecture guide ↗</a><a href="read.html?file=docs/USING.md">Integration guide ↗</a></div>
 </aside>
 <main class="document" id="content">
 <div class="topline"><span class="edition">Technology Lab · Systems engineering</span><span>06 September 2026 <button class="print-button no-print" id="print" type="button"> / Print</button></span></div>
@@ -78,10 +78,12 @@
 <figure class="figure"><div class="figure-scroll" tabindex="0" aria-label="Architecture diagram"><!-- diagram: topology --></div><figcaption><b>FIGURE 02</b> Each shard reserves the full slot capacity. The shared admission counter enforces the total connection ceiling.</figcaption></figure>
 <p>Inline execution runs application callbacks on the I/O owner. Each CPU denotes a logical processor.</p>
 <p>Linux selects one inline shard per allowed CPU, with an automatic maximum of sixteen.</p>
-<p>Explicit Linux configurations support up to sixty-four shards within the resource budget. macOS currently supports one shard.</p>
+<p>Explicit Linux configurations support up to sixty-four shards within the resource budget. macOS and Windows currently support one shard.</p>
 <p>The macOS decision follows the recorded listener-distribution experiment. That observation does not establish universal behavior across macOS releases.</p>
 <p>Linux uses a custom <code>io_uring</code> backend. The Linux interface provides submission and completion queues for asynchronous operations.</p>
 <p>macOS uses nonblocking sockets and <code>kqueue</code>. The macOS interface reports readiness. The adapter translates readiness into operation results.</p>
+<p>Windows uses overlapped sockets and an I/O completion port (IOCP). The completion port delivers operation results to the owner.</p>
+<p>Fixed operation records retain buffers through completion and cancellation. Windows uses the same callback, writer, batching, and admission contracts.</p>
 <div class="callout"><strong>More shards require more reserved memory.</strong><p>Three shards reserve three sets of connection storage. The shared admission ceiling does not divide the reserved slot count between shards.</p></div>
 <div class="table-wrap"><table><caption>Memory scope in the recorded 128-connection configuration</caption><thead><tr><th>Resource</th><th>One shard</th><th>Three shards</th></tr></thead><tbody><tr><td>Requested framework heap</td><td>29,635,986 bytes</td><td>88,907,590 bytes</td></tr><tr><td>Requested secondary-owner stacks</td><td>None</td><td>Two × 1 MiB</td></tr><tr><td>Admitted connections</td><td>128 total</td><td>128 total</td></tr></tbody></table></div>
 <p class="note">The figures exclude kernel queues, allocator overhead, application allocations and actual stack mappings. The heap metric is not process memory usage.</p>
@@ -187,10 +189,12 @@ zig build run -Doptimize=ReleaseSafe -- --port 8081 --duration-ms 30000</code></
 <tr><td>Ownership remains uncertain</td><td>The process terminates instead of freeing storage with outstanding borrows.</td></tr>
 <tr><td>An inline callback never returns</td><td>The framework cannot preempt that callback. An external watchdog must supervise a violating application.</td></tr>
 </tbody></table></div>
-<p>The current server binds IPv4 loopback and serves plain HTTP. Transport Layer Security (TLS), Windows HTTP and production deployment qualification remain pending.</p>
+<p>The current server binds IPv4 loopback and serves plain HTTP. Transport Layer Security (TLS) and production deployment qualification remain pending.</p>
+<p>Windows currently uses one shard. The <a href="read.html?file=reports/2026-09-06-windows-iocp.md">Windows verification receipt</a> records native x64 results and explicit exclusions.</p>
+<p>Winsock creates socket resources during admission. Fixed framework storage does not bound provider allocations or delayed kernel cleanup.</p>
 <p>Dynamic borrow-release notifications and per-request worker offload remain pending. Applications cannot safely invent those ownership mechanisms around the current API.</p>
 <p>Future measurements include HTML workloads, macOS contenders, external network traffic and trustworthy response-tail statistics.</p>
-<p class="note">Current native evidence covers macOS and Linux. A cross-compiled binary does not establish runtime behavior on another platform.</p>
+<p class="note">Runtime evidence applies to the exact recorded hosts and revisions. A cross-compiled binary does not establish runtime behavior on another platform.</p>
 </section>
 <section class="section" id="references">
 <p class="eyebrow">09 / Sources and further reading</p><h2>Read the implementation.<br>Reproduce the evidence.</h2>
@@ -202,6 +206,7 @@ zig build run -Doptimize=ReleaseSafe -- --port 8081 --duration-ms 30000</code></
 <li><a href="read.html?file=docs/USING.md">Integration guide</a> · dependency setup, callbacks, response writing and operational checks.</li>
 <li><a href="read.html?file=src/main.zig">Demo entry point</a>, <a href="read.html?file=src/server.zig">cluster and server</a>, <a href="read.html?file=src/api.zig">application API</a>, <a href="read.html?file=docs/OWNERSHIP.md">ownership contract</a>.</li>
 <li><a href="https://github.com/technologylab-ai/zig-http/tree/4b3cd5551d80b422ec6ef763627d019e6f1dfb83">Immutable runtime publication</a> · Zig 0.16.0, custom io_uring and kqueue backends.</li>
+<li><a href="https://github.com/technologylab-ai/bounded-http/tree/70f9ae5917076b664081db59c62edc4959ca5041">Windows IOCP implementation</a> · Native x64 correctness verified; <a href="read.html?file=reports/2026-09-06-windows-iocp.md">results and exclusions</a>.</li>
 <li><a href="read.html?file=reports/2026-09-05-arena-adoption.md">Qualified comparison</a> and <a href="read.html?file=reports/2026-09-05-arena-adoption/packet.json">evidence manifest</a> · exact versions, binary hashes, sample ranges and host conditions.</li>
 <li><a href="read.html?file=reports/2026-09-05-arena-adoption/summarize.py">Read-only evidence verifier</a> · checks raw results without starting a server.</li>
 <li><a href="https://technologylab-ai.github.io/zigllmwiki/?page=wiki/tigerstyle.md">TigerStyle synthesis</a> · source-driven guidance for resource bounds, assertions and ownership.</li>

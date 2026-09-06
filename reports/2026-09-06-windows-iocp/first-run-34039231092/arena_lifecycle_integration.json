@@ -1,0 +1,1 @@
+{"error": "AttributeError: module 'signal' has no attribute 'SIGSTOP'", "ok": false, "passed": 0, "platform": "win32", "schema_version": 1, "seconds": 0.078, "server": "D:\\a\\bounded-http\\bounded-http\\zig-out\\bin\\bounded-http.exe", "sessions": [], "tests": [], "tool": "bounded-http-arena-lifecycle-integration"}

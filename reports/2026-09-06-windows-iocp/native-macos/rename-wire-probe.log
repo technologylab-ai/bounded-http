@@ -1,0 +1,76 @@
+{
+  "ok": true,
+  "cases": [
+    {
+      "method": "GET",
+      "status": 200,
+      "server": "bounded-http",
+      "body_bytes": 13
+    },
+    {
+      "method": "HEAD",
+      "status": 200,
+      "server": "bounded-http",
+      "body_bytes": 0
+    },
+    {
+      "method": "GET",
+      "status": 404,
+      "server": "bounded-http",
+      "body_bytes": 9
+    }
+  ],
+  "stats": {
+    "execution": "inline_event_loop",
+    "gather_send": true,
+    "response_batch_limit": 128,
+    "callbacks_per_turn": 2048,
+    "shards": 1,
+    "response_batches": 1,
+    "batched_finished_responses": 3,
+    "max_batch_responses": 3,
+    "scalar_send_operations": 0,
+    "gather_send_operations": 60,
+    "single_span_send_operations": 60,
+    "borrow_copies": 3,
+    "response_draft_copy_bytes": 0,
+    "send_completions": 60,
+    "short_send_completions": 0,
+    "gather_cancel_requests": 0,
+    "gather_canceled_completions": 0,
+    "max_canceled_batch_responses": 0,
+    "max_send_parts": 1,
+    "max_send_bytes": 7,
+    "max_inline_callbacks_per_turn": 3,
+    "inline_dispatches": 3,
+    "worker_dispatches": 0,
+    "accepted": 1,
+    "completed": 3,
+    "rejected": 0,
+    "timeouts": 0,
+    "flushes": 0,
+    "resumed": 0,
+    "bytes_received": 152,
+    "bytes_sent": 419,
+    "pipeline_copy_bytes": 0,
+    "live_connections": 0,
+    "peak_connections": 1,
+    "live_operations": 0,
+    "peak_operations": 2,
+    "max_loop_ns": 22000,
+    "turns": 64,
+    "idle_polls": 1,
+    "prearmed_receives": 0,
+    "max_handler_ns": 0,
+    "max_queue_ns": 0,
+    "max_request_ns": 1205000,
+    "workers": 0,
+    "allocation_calls_after_start": 0,
+    "framework_heap_peak_bytes": 1415418,
+    "framework_heap_limit_bytes": 536870912
+  },
+  "server_log": [
+    "READY port=54303 backend=kqueue connections=16 workers=0 execution=inline_event_loop gather_send=1 response_batch_limit=128 shards=1 callbacks_per_turn=2048 optimize=ReleaseSafe",
+    "STATS {\"execution\":\"inline_event_loop\",\"gather_send\":true,\"response_batch_limit\":128,\"callbacks_per_turn\":2048,\"shards\":1,\"response_batches\":1,\"batched_finished_responses\":3,\"max_batch_responses\":3,\"scalar_send_operations\":0,\"gather_send_operations\":60,\"single_span_send_operations\":60,\"borrow_copies\":3,\"response_draft_copy_bytes\":0,\"send_completions\":60,\"short_send_completions\":0,\"gather_cancel_requests\":0,\"gather_canceled_completions\":0,\"max_canceled_batch_responses\":0,\"max_send_parts\":1,\"max_send_bytes\":7,\"max_inline_callbacks_per_turn\":3,\"inline_dispatches\":3,\"worker_dispatches\":0,\"accepted\":1,\"completed\":3,\"rejected\":0,\"timeouts\":0,\"flushes\":0,\"resumed\":0,\"bytes_received\":152,\"bytes_sent\":419,\"pipeline_copy_bytes\":0,\"live_connections\":0,\"peak_connections\":1,\"live_operations\":0,\"peak_operations\":2,\"max_loop_ns\":22000,\"turns\":64,\"idle_polls\":1,\"prearmed_receives\":0,\"max_handler_ns\":0,\"max_queue_ns\":0,\"max_request_ns\":1205000,\"workers\":0,\"allocation_calls_after_start\":0,\"framework_heap_peak_bytes\":1415418,\"framework_heap_limit_bytes\":536870912}"
+  ]
+}

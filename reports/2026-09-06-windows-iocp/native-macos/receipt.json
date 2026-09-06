@@ -1,0 +1,178 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "/Users/rs/bin/zig",
+        "build",
+        "verify",
+        "--summary",
+        "all"
+      ],
+      "finished_utc": "2026-09-06T14:40:38.347097+00:00",
+      "name": "verify-debug",
+      "pid": 92798,
+      "returncode": 0,
+      "started_utc": "2026-09-06T14:40:27.166093+00:00",
+      "watchdog_seconds": 300
+    },
+    {
+      "argv": [
+        "/Users/rs/bin/zig",
+        "build",
+        "verify",
+        "-Doptimize=ReleaseSafe",
+        "--summary",
+        "all"
+      ],
+      "finished_utc": "2026-09-06T14:40:47.296757+00:00",
+      "name": "verify-release-safe",
+      "pid": 92977,
+      "returncode": 0,
+      "started_utc": "2026-09-06T14:40:38.347473+00:00",
+      "watchdog_seconds": 300
+    },
+    {
+      "argv": [
+        "/Users/rs/bin/zig",
+        "build",
+        "-Doptimize=ReleaseSafe"
+      ],
+      "finished_utc": "2026-09-06T14:40:47.623110+00:00",
+      "name": "build-release-safe",
+      "pid": 93118,
+      "returncode": 0,
+      "started_utc": "2026-09-06T14:40:47.297164+00:00",
+      "watchdog_seconds": 180
+    },
+    {
+      "argv": [
+        "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot/zig-out/bin/bounded-http",
+        "--help"
+      ],
+      "finished_utc": "2026-09-06T14:40:48.161613+00:00",
+      "name": "help",
+      "pid": 93129,
+      "returncode": 0,
+      "started_utc": "2026-09-06T14:40:47.624148+00:00",
+      "watchdog_seconds": 10
+    },
+    {
+      "argv": [
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+        "tests/test_compare.py",
+        "-v"
+      ],
+      "finished_utc": "2026-09-06T14:40:48.477949+00:00",
+      "name": "comparator-tests",
+      "pid": 93137,
+      "returncode": 0,
+      "started_utc": "2026-09-06T14:40:48.162165+00:00",
+      "watchdog_seconds": 30
+    },
+    {
+      "argv": [
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+        "tests/arena_lifecycle_integration.py",
+        "--json",
+        "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/macos/arena_lifecycle-integration.json"
+      ],
+      "finished_utc": "2026-09-06T14:40:48.799064+00:00",
+      "name": "arena_lifecycle-integration",
+      "pid": 93141,
+      "returncode": 0,
+      "started_utc": "2026-09-06T14:40:48.478356+00:00",
+      "watchdog_seconds": 180
+    },
+    {
+      "argv": [
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+        "tests/batch_integration.py",
+        "--json",
+        "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/macos/batch-integration.json"
+      ],
+      "finished_utc": "2026-09-06T14:40:53.210984+00:00",
+      "name": "batch-integration",
+      "pid": 93154,
+      "returncode": 0,
+      "started_utc": "2026-09-06T14:40:48.799543+00:00",
+      "watchdog_seconds": 180
+    },
+    {
+      "argv": [
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+        "tests/gather_integration.py",
+        "--json",
+        "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/macos/gather-integration.json"
+      ],
+      "finished_utc": "2026-09-06T14:40:54.860129+00:00",
+      "name": "gather-integration",
+      "pid": 93450,
+      "returncode": 0,
+      "started_utc": "2026-09-06T14:40:53.211651+00:00",
+      "watchdog_seconds": 180
+    },
+    {
+      "argv": [
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+        "tests/inline_integration.py",
+        "--json",
+        "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/macos/inline-integration.json"
+      ],
+      "finished_utc": "2026-09-06T14:40:55.412382+00:00",
+      "name": "inline-integration",
+      "pid": 93489,
+      "returncode": 0,
+      "started_utc": "2026-09-06T14:40:54.860632+00:00",
+      "watchdog_seconds": 180
+    },
+    {
+      "argv": [
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+        "tests/integration.py",
+        "--json",
+        "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/macos/integration.json"
+      ],
+      "finished_utc": "2026-09-06T14:40:59.820112+00:00",
+      "name": "integration",
+      "pid": 93505,
+      "returncode": 0,
+      "started_utc": "2026-09-06T14:40:55.412892+00:00",
+      "watchdog_seconds": 180
+    },
+    {
+      "argv": [
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+        "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/macos/rename-wire-probe.py"
+      ],
+      "finished_utc": "2026-09-06T14:40:59.914335+00:00",
+      "name": "rename-wire-probe",
+      "pid": 93549,
+      "returncode": 0,
+      "started_utc": "2026-09-06T14:40:59.820676+00:00",
+      "watchdog_seconds": 30
+    },
+    {
+      "argv": [
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+        "tools/smoke.py",
+        "--json",
+        "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/macos/smoke.json"
+      ],
+      "finished_utc": "2026-09-06T14:41:00.865946+00:00",
+      "name": "smoke",
+      "pid": 93553,
+      "returncode": 0,
+      "started_utc": "2026-09-06T14:40:59.914789+00:00",
+      "watchdog_seconds": 180
+    }
+  ],
+  "finished_utc": "2026-09-06T14:41:01.044709+00:00",
+  "ok": true,
+  "owned_children_drained": true,
+  "reservation_released": true,
+  "scope": "clean pushed Windows candidate70f9ae5 native macOS regression; no timed comparison",
+  "stable_source_inputs": true,
+  "started_utc": "2026-09-06T14:40:26.928802+00:00",
+  "tracked_changes_during_gate": [],
+  "workdir": "/Users/rs/code/github.com/technologylab.ai/bounded-http-windows/.zig-cache/windows-posix-candidate-70f9ae5/snapshot"
+}

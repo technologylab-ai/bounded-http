@@ -1,0 +1,83 @@
+{
+  "repository": "MicrosoftDocs/sdk-api",
+  "revision": "5f2625b6782d3e9c0df08756583c527a0a2872ca",
+  "commit_verified": "5f2625b6782d3e9c0df08756583c527a0a2872ca",
+  "tree": "dfde8fe2c7e0b9aca036b727aa7b433c6352f4d5",
+  "captured_utc": "2026-09-06T14:29:38.644060+00:00",
+  "files": [
+    {
+      "path": "sdk-api-src/content/mswsock/nf-mswsock-acceptex.md",
+      "blob": "7bfcfad66225c8908e88ebc63d872b2397799d48",
+      "bytes": 20149,
+      "sha256": "d549618e1d478c68e3021d14279a5b266b5a8aaf2eee38ead7692f707d7fd181",
+      "url": "https://github.com/MicrosoftDocs/sdk-api/blob/5f2625b6782d3e9c0df08756583c527a0a2872ca/sdk-api-src/content/mswsock/nf-mswsock-acceptex.md",
+      "local": ".zig-cache/windows-primary-source/sdk-api-src/content/mswsock/nf-mswsock-acceptex.md"
+    },
+    {
+      "path": "sdk-api-src/content/winsock2/nf-winsock2-wsasocketw.md",
+      "blob": "eec07212b06dcc6e0a2a3c298b333f27a7c12b5e",
+      "bytes": 47962,
+      "sha256": "e13325582ddebc10f6f2503c2d97d729fdc131a1aa4f828faea07b80b71c9d04",
+      "url": "https://github.com/MicrosoftDocs/sdk-api/blob/5f2625b6782d3e9c0df08756583c527a0a2872ca/sdk-api-src/content/winsock2/nf-winsock2-wsasocketw.md",
+      "local": ".zig-cache/windows-primary-source/sdk-api-src/content/winsock2/nf-winsock2-wsasocketw.md"
+    },
+    {
+      "path": "sdk-api-src/content/winsock/nf-winsock-closesocket.md",
+      "blob": "f66cb2fc76b4231c52c7257fe83d8be79f6b5e54",
+      "bytes": 18561,
+      "sha256": "a28177ebf3ada04962b14063ccb1d809d0caa8005c259b26a348f91f63bdd38e",
+      "url": "https://github.com/MicrosoftDocs/sdk-api/blob/5f2625b6782d3e9c0df08756583c527a0a2872ca/sdk-api-src/content/winsock/nf-winsock-closesocket.md",
+      "local": ".zig-cache/windows-primary-source/sdk-api-src/content/winsock/nf-winsock-closesocket.md"
+    },
+    {
+      "path": "sdk-api-src/content/winsock/nf-winsock-setsockopt.md",
+      "blob": "b615fe42db56f7760eb0d30a3fc905020e50c4d1",
+      "bytes": 21823,
+      "sha256": "667cc0b5add588aac906f8c5d9acc7012414c88b84457ef69bd6a1004704f709",
+      "url": "https://github.com/MicrosoftDocs/sdk-api/blob/5f2625b6782d3e9c0df08756583c527a0a2872ca/sdk-api-src/content/winsock/nf-winsock-setsockopt.md",
+      "local": ".zig-cache/windows-primary-source/sdk-api-src/content/winsock/nf-winsock-setsockopt.md"
+    },
+    {
+      "path": "sdk-api-src/content/winsock2/nf-winsock2-wsaioctl.md",
+      "blob": "0297ab0365ba531be85af77f0c3b24588b83a2a4",
+      "bytes": 17006,
+      "sha256": "4d3513773b0b0b091701a443a1bf96d4ff9121bebb5910db45d562496dc561fe",
+      "url": "https://github.com/MicrosoftDocs/sdk-api/blob/5f2625b6782d3e9c0df08756583c527a0a2872ca/sdk-api-src/content/winsock2/nf-winsock2-wsaioctl.md",
+      "local": ".zig-cache/windows-primary-source/sdk-api-src/content/winsock2/nf-winsock2-wsaioctl.md"
+    }
+  ],
+  "zig_abi": {
+    "version": "0.16.0",
+    "revision": "44d9672fed001115e674fd5ddb32747ef43a7af4",
+    "files": [
+      {
+        "path": "lib/libc/include/any-windows-any/mswsock.h",
+        "bytes": 8753,
+        "sha256": "08a5e815a1f2714878a25fb6cef76d7c3f8e15a13b5cb242c3dd2949c6825b57",
+        "url": "https://github.com/ziglang/zig/blob/44d9672fed001115e674fd5ddb32747ef43a7af4/lib/libc/include/any-windows-any/mswsock.h",
+        "local": ".zig-cache/windows-primary-source/zig-0.16.0/lib/libc/include/any-windows-any/mswsock.h"
+      },
+      {
+        "path": "lib/libc/include/any-windows-any/winsock2.h",
+        "bytes": 52886,
+        "sha256": "fc717ca4b018dd7c3f762051a49038be3a25ebb70dff18b7b76f9aa02051edca",
+        "url": "https://github.com/ziglang/zig/blob/44d9672fed001115e674fd5ddb32747ef43a7af4/lib/libc/include/any-windows-any/winsock2.h",
+        "local": ".zig-cache/windows-primary-source/zig-0.16.0/lib/libc/include/any-windows-any/winsock2.h"
+      },
+      {
+        "path": "lib/libc/include/any-windows-any/psdk_inc/_wsadata.h",
+        "bytes": 810,
+        "sha256": "5bac49316395a076a50581949133af41806f004c6893730f609c675f513109e6",
+        "url": "https://github.com/ziglang/zig/blob/44d9672fed001115e674fd5ddb32747ef43a7af4/lib/libc/include/any-windows-any/psdk_inc/_wsadata.h",
+        "local": ".zig-cache/windows-primary-source/zig-0.16.0/lib/libc/include/any-windows-any/psdk_inc/_wsadata.h"
+      },
+      {
+        "path": "lib/std/os/windows/ws2_32.zig",
+        "bytes": 6230,
+        "sha256": "35d7af27e610f57d39e1c3dc83cce7dd9d15b0bb8c59dc850076c5ecfb09e1eb",
+        "url": "https://github.com/ziglang/zig/blob/44d9672fed001115e674fd5ddb32747ef43a7af4/lib/std/os/windows/ws2_32.zig",
+        "local": ".zig-cache/windows-primary-source/zig-0.16.0/lib/std/os/windows/ws2_32.zig"
+      }
+    ]
+  }
+}
