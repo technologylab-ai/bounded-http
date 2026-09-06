@@ -1,8 +1,16 @@
-# Windows shard PR handoff — 2026-09-06
+# Windows shards merged — 2026-09-06
 
-Windows now has bounded socket distribution across independent IOCP owners on the feature branch.
-The user requested a PR, so main remains unchanged and this work must not be merged automatically.
-Worktree: `../bounded-http-windows-shards`; branch: `feat/windows-shards`.
+[PR #2](https://github.com/technologylab-ai/bounded-http/pull/2) merged with explicit user approval.
+Merge commit: `1c74a4e379c365ec0a201e6fe3df1a5a9718d504`.
+Its Git tree exactly matches verified feature commit `419de5445901a87ea6973020df5b13a420917483`.
+The canonical `bounded-http` checkout is on synced main; other worktrees can fast-forward from origin/main.
+The preserved feature worktree is `../bounded-http-windows-shards`, branch `feat/windows-shards`.
+
+[Final Windows run 34044844060](https://github.com/technologylab-ai/bounded-http/actions/runs/34044844060) passed against the feature commit before merge.
+The merge introduces no source difference; it is not a separate runtime execution.
+Final macOS and Linux Debug/ReleaseSafe, wire, comparator, embedding, and exact-body smoke gates also passed on that feature commit.
+The [merge Pages deployment](https://github.com/technologylab-ai/bounded-http/actions/runs/34045683304) passed.
+This follow-up changes only the durable handoff and roadmap completion state.
 
 Shard zero owns one exclusive listener and processes its own round-robin share.
 Secondary owners receive unassociated sockets through startup-fixed queues before receiving request bytes.
@@ -30,7 +38,8 @@ The documentation reader includes the new native shard receipt.
 Final publication gates belong to the PR's exact pushed feature commit; consult its checks and description.
 Do not reinterpret this candidate receipt as evidence for an unidentified later source tree.
 
-After review and merge, sync the wiki's Windows HTTP synthesis with the merged implementation and pinned report.
+Wiki synchronization records the merged implementation alongside its pinned feature-runtime evidence.
+Do not rewrite earlier immutable source records or treat the merge as another Windows test run.
 The wiki's M3-006 remains postponed.
 The [roadmap](ROADMAP.md) still contains API, reliability, performance, and higher-level work.
 
