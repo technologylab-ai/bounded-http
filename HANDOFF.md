@@ -12,6 +12,10 @@ The preview receipt and screenshots remain in `.zig-cache/native-backends-site/l
 The isolated browser and preview server stopped; the Mac reservation was released.
 This documentation change adds no new runtime or comparative-performance evidence.
 
+The Windows handoff subsection now ends before a divided section titled “Memory ownership across all platforms.”
+The memory table explicitly labels its recorded Linux configuration.
+Desktop, mobile, and print checks passed; their packet remains in `.zig-cache/section-scope-site/local/`.
+
 # Worker streaming merged — 2026-09-06
 
 [PR #3](https://github.com/technologylab-ai/bounded-http/pull/3) merged at `86e8ec2cc5fbe9f5d08ed01c496d61ae519cf261`.

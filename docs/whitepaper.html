@@ -28,6 +28,7 @@
 @media(max-width:760px){.backend-specs a{padding:12px 10px}.backend-specs strong{font-size:18px}.backend-mode{font-size:11px}.backend-platform{font-size:10px}}
 @media(max-width:400px){.backend-specs a{padding:11px 8px}.backend-specs strong{font-size:16px;letter-spacing:-.5px}}
 @media print{.backend-specs{break-inside:avoid}.backend-specs a{padding:10px 15px}.backend-specs strong{font-size:17pt}}
+.shared-scope{margin-top:38px;padding-top:10px;border-top:1px solid var(--line)}
 </style>
 </head>
 <body>
@@ -114,7 +115,8 @@
 <p>Windows defaults to one shard. Select additional inline owners with <code>--shards N</code>.</p>
 <p id="windows-io">Windows uses overlapped sockets and one I/O completion port (IOCP) per shard. Each port delivers operation results to its owner.</p>
 <p>Fixed operation records retain buffers through completion and cancellation. Windows uses the same callback, writer, batching, and admission contracts.</p>
-<h3>Windows: one listener, independent owners.</h3>
+<section aria-labelledby="windows-handoff-heading">
+<h3 id="windows-handoff-heading">Windows: one listener, independent owners.</h3>
 <p>Shard zero accepts connections and handles its own round-robin share. Fixed queues transfer other sockets to their destination owners.</p>
 <p>Each transfer carries a socket handle and acceptance time. Request bytes enter the destination’s own buffer after the transfer.</p>
 <p>The destination associates the socket with its IOCP before receiving bytes. Established connections remain with that owner.</p>
@@ -168,9 +170,14 @@
 </g></svg></div><figcaption><b>WINDOWS HANDOFF</b> Queued sockets retain their admission charge and original deadline. No extra acceptor thread is created.</figcaption></figure>
 <p>The shared connection ceiling includes queue residence and adoption. Each queue has startup-fixed capacity.</p>
 <p>Shutdown stops publication, drains queued sockets and operations, then joins owners. The cluster frees storage only after ownership ends.</p>
+</section>
+<section class="shared-scope" aria-labelledby="shared-memory">
+<h3 id="shared-memory">Memory ownership across all platforms.</h3>
+<p>Every backend reserves connection storage per shard. The table below records a Linux configuration.</p>
 <div class="callout"><strong>More shards require more reserved memory.</strong><p>Three shards reserve three sets of connection storage. The shared admission ceiling does not divide the reserved slot count between shards.</p></div>
-<div class="table-wrap"><table><caption>Memory scope in the recorded 128-connection configuration</caption><thead><tr><th>Resource</th><th>One shard</th><th>Three shards</th></tr></thead><tbody><tr><td>Requested framework heap</td><td>29,635,986 bytes</td><td>88,907,590 bytes</td></tr><tr><td>Requested secondary-owner stacks</td><td>None</td><td>Two × 1 MiB</td></tr><tr><td>Admitted connections</td><td>128 total</td><td>128 total</td></tr></tbody></table></div>
+<div class="table-wrap"><table><caption>Recorded Linux example · 128 total connections</caption><thead><tr><th>Resource</th><th>One shard</th><th>Three shards</th></tr></thead><tbody><tr><td>Requested framework heap</td><td>29,635,986 bytes</td><td>88,907,590 bytes</td></tr><tr><td>Requested secondary-owner stacks</td><td>None</td><td>Two × 1 MiB</td></tr><tr><td>Admitted connections</td><td>128 total</td><td>128 total</td></tr></tbody></table></div>
 <p class="note">The figures exclude kernel queues, allocator overhead, application allocations and actual stack mappings. The heap metric is not process memory usage.</p>
+</section>
 </section>
 <section class="section" id="request">
 <p class="eyebrow">04 / Request and response</p><h2>The callback returns an action.<br>The owner provides progress.</h2>
