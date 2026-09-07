@@ -30,7 +30,14 @@ fn requestControlStop() void {
     if (active_cluster.load(.seq_cst)) |cluster| cluster.requestStopFromSignal();
 }
 
+const NotificationEntry = struct {
+    // Each fixture entry is published once and retained until server shutdown.
+    published: std.atomic.Value(u8) = .init(0),
+    handle: api.Notification = undefined,
+};
+
 const Demo = struct {
+    notifications: [128]NotificationEntry = @splat(.{}),
     html: []const u8,
     stall_ms: u32,
     execution: framework.Execution,
@@ -208,6 +215,8 @@ fn handle(context: *api.Context) !api.Action {
         writer.commit(body.len);
         return writer.finish();
     }
+    if (std.mem.startsWith(u8, path, "/notify") or std.mem.startsWith(u8, path, "/signal/"))
+        return notificationContinuation(context, demo, path);
     if (std.mem.eql(u8, path, "/timed-chunks") or std.mem.eql(u8, path, "/wait-only") or
         std.mem.eql(u8, path, "/empty-timer") or std.mem.eql(u8, path, "/abort-after-flush"))
         return timedContinuation(context, demo, path);
@@ -307,6 +316,61 @@ fn handle(context: *api.Context) !api.Action {
         try writer.begin(404, "text/plain", 9);
         try writer.borrow("not found");
     }
+    return writer.finish();
+}
+
+/// Notification fixtures publish fixed handles without request-time allocation.
+fn notificationContinuation(context: *api.Context, demo: *Demo, path: []const u8) !api.Action {
+    const slash = std.mem.lastIndexOfScalar(u8, path, '/') orelse return error.InvalidFixture;
+    const index = try std.fmt.parseInt(usize, path[slash + 1 ..], 10);
+    if (index >= demo.notifications.len) return error.InvalidFixture;
+    const entry = &demo.notifications[index];
+    const writer = context.writer;
+    if (std.mem.startsWith(u8, path, "/signal/")) {
+        if (entry.published.load(.acquire) != 2) {
+            try writer.begin(404, "text/plain", 0);
+        } else {
+            const body = @tagName(entry.handle.signal());
+            try writer.begin(200, "text/plain", body.len);
+            try writer.borrow(body);
+        }
+        return writer.finish();
+    }
+    if (context.event == .cancelled) {
+        continuationDone(context, true);
+        return .close;
+    }
+    if (context.event == .request) {
+        if (entry.published.cmpxchgStrong(0, 1, .acq_rel, .acquire) != null) {
+            try writer.begin(503, "text/plain", 0);
+            return writer.finish();
+        }
+        entry.handle = try context.notification();
+        entry.published.store(2, .release);
+        context.state[7] = 1;
+        _ = demo.continuation_live.fetchAdd(1, .monotonic);
+        _ = demo.continuation_started.fetchAdd(1, .release);
+        context.requestCancellation();
+        if (std.mem.startsWith(u8, path, "/notify-before/")) {
+            std.debug.assert(entry.handle.signal() == .notified);
+            std.debug.assert(entry.handle.signal() == .coalesced);
+            return context.waitNotification(0);
+        }
+        if (std.mem.startsWith(u8, path, "/notify-timeout/"))
+            return context.waitNotification(@as(u64, demo.stall_ms) * std.time.ns_per_ms);
+        if (std.mem.startsWith(u8, path, "/notify-flush/")) {
+            try writer.begin(200, "text/plain", null);
+            try writer.borrow("start ");
+            return writer.flush();
+        }
+        return context.waitNotification(null);
+    }
+    if (context.event == .flushed) return context.waitNotification(null);
+    std.debug.assert(context.event == .notified or context.event == .timer);
+    const body = if (context.event == .notified) "notified" else "timer";
+    if (!writer.began) try writer.begin(200, "text/plain", body.len);
+    try writer.borrow(body);
+    continuationDone(context, false);
     return writer.finish();
 }
 

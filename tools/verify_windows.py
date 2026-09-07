@@ -126,7 +126,7 @@ def main():
             [sys.executable, 'tests/continuation_integration.py', '--server', str(binary),
              '--json', str(packet / 'continuation-integration.json')], 150)
         continuation = json.loads((packet / 'continuation-integration.json').read_text())
-        require(continuation.get('ok') is True and continuation.get('groups') == 9,
+        require(continuation.get('ok') is True and continuation.get('groups') == 18,
                 'Continuation timer/cancellation receipt mismatch')
         run('windows-shards-integration',
             [sys.executable, 'tests/windows_shards_integration.py', '--server', str(binary),

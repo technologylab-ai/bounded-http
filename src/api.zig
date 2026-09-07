@@ -3,9 +3,66 @@ pub const http = @import("http.zig");
 const assert = std.debug.assert;
 
 pub const Action = enum { flush, finish, close, wait };
-pub const Event = enum { request, flushed, timer, cancelled };
+pub const Event = enum { request, flushed, timer, notified, cancelled };
 pub const Handler = *const fn (*Context) Action;
 pub const FlushError = error{ BlockingFlushUnavailable, InvalidState, Cancelled };
+
+/// A producer handle signals one request. Signals coalesce until the request consumes them.
+/// The producer must stop before Server.deinit releases the cell storage.
+/// A stale handle is safe only while that server storage remains allocated.
+pub const Notification = struct {
+    cell: *Cell,
+    generation: u64,
+
+    pub const Result = enum { notified, coalesced, stale };
+
+    /// Signal from any thread without allocation or waiting for the request callback.
+    /// Success records a wakeup; it does not acknowledge application processing.
+    pub fn signal(self: Notification) Result {
+        const ready = self.generation | Cell.active;
+        const observed = self.cell.state.load(.acquire);
+        if (observed == ready | Cell.pending) return .coalesced;
+        if (observed != ready) return .stale;
+        if (self.cell.state.cmpxchgStrong(ready, ready | Cell.pending, .acq_rel, .acquire)) |changed| {
+            return if (changed == ready | Cell.pending) .coalesced else .stale;
+        }
+        return .notified;
+    }
+
+    /// The scheduler owns activation and consumption. Producers only call signal().
+    pub const Cell = struct {
+        state: std.atomic.Value(u64) = .init(0),
+        const active: u64 = 1;
+        const pending: u64 = 2;
+        const flags: u64 = active | pending;
+
+        /// Advance once per request, including requests on persistent connections.
+        /// Exhaustion permanently retires the cell instead of reusing a generation.
+        pub fn activate(self: *Cell) error{NotificationGenerationExhausted}!void {
+            const previous = self.state.load(.acquire);
+            assert(previous & flags == 0);
+            const generation = std.math.add(u64, previous, flags + 1) catch
+                return error.NotificationGenerationExhausted;
+            self.state.store(generation | active, .release);
+        }
+
+        pub fn handle(self: *Cell) ?Notification {
+            const observed = self.state.load(.acquire);
+            if (observed & active == 0) return null;
+            return .{ .cell = self, .generation = observed & ~flags };
+        }
+
+        pub fn deactivate(self: *Cell) void {
+            _ = self.state.fetchAnd(~flags, .acq_rel);
+        }
+
+        /// Only the request owner consumes signals, while no callback runs.
+        pub fn consume(self: *Cell) bool {
+            const observed = self.state.fetchAnd(~pending, .acq_rel);
+            return observed & flags == flags;
+        }
+    };
+};
 
 pub const Context = struct {
     request: *const http.Request,
@@ -20,6 +77,8 @@ pub const Context = struct {
     /// Internal callback result metadata. Use requestCancellation() and wait().
     notify_cancel: bool = false,
     resume_after_ns: ?u64 = null,
+    await_notification: bool = false,
+    notification_cell: ?*Notification.Cell = null,
 
     /// Request one cancellation callback if this callback returns flush or wait.
     /// Cancellation runs on the configured application executor after kernel borrows end.
@@ -38,6 +97,27 @@ pub const Context = struct {
             (self.writer.began and (!self.writer.headers_committed or self.writer.bodyBytes() != 0)))
             return error.InvalidState;
         self.resume_after_ns = delay_ns;
+        self.await_notification = false;
+        return .wait;
+    }
+
+    /// Obtain a handle without retaining the callback context or request storage.
+    pub fn notification(self: *Context) error{ NotificationUnavailable, Cancelled }!Notification {
+        if (self.cancelled.load(.acquire)) return error.Cancelled;
+        const cell = self.notification_cell orelse return error.NotificationUnavailable;
+        return cell.handle() orelse error.Cancelled;
+    }
+
+    /// Release the callback until a producer signals or the optional timer expires.
+    /// Signals before this call remain pending. Repeated signals coalesce.
+    /// A pending notification takes precedence over an expired optional timer.
+    /// The owner observes signals within its normal poll cycle, usually ten milliseconds.
+    /// The request deadline still applies. Publish pending bytes before waiting.
+    pub fn waitNotification(self: *Context, timeout_ns: ?u64) error{ NotificationUnavailable, InvalidState, Cancelled }!Action {
+        _ = try self.notification();
+        _ = try self.wait(timeout_ns orelse 0);
+        self.resume_after_ns = timeout_ns;
+        self.await_notification = true;
         return .wait;
     }
 
@@ -747,10 +827,20 @@ test "timer waits reject output ownership and cancellation without publication" 
     var state: [8]usize = @splat(0);
     var cancelled: std.atomic.Value(bool) = .init(false);
     var context: Context = .{ .request = &request, .writer = &writer, .event = .request, .state = &state, .application = null, .cancelled = &cancelled };
+    try std.testing.expectError(error.NotificationUnavailable, context.notification());
+    try std.testing.expectError(error.NotificationUnavailable, context.waitNotification(null));
+    var cell: Notification.Cell = .{};
+    try cell.activate();
+    context.notification_cell = &cell;
+    try std.testing.expectEqual(Action.wait, try context.waitNotification(null));
+    try std.testing.expect(context.await_notification and context.resume_after_ns == null);
+    try std.testing.expectEqual(Action.wait, try context.waitNotification(42));
+    try std.testing.expect(context.await_notification and context.resume_after_ns.? == 42);
     context.requestCancellation();
     try std.testing.expect(context.notify_cancel);
     try std.testing.expectEqual(Action.wait, try context.wait(0));
     try std.testing.expectEqual(@as(?u64, 0), context.resume_after_ns);
+    try std.testing.expect(!context.await_notification);
     try writer.begin(200, "text/plain", null);
     try std.testing.expectError(error.InvalidState, context.wait(1));
     _ = writer.flush();
@@ -765,4 +855,63 @@ test "timer waits reject output ownership and cancellation without publication" 
     try std.testing.expectError(error.InvalidState, context.wait(1));
     cancelled.store(true, .release);
     try std.testing.expectError(error.Cancelled, context.wait(1));
+    try std.testing.expectError(error.Cancelled, context.notification());
+    try std.testing.expectError(error.Cancelled, context.waitNotification(null));
+}
+
+test "notification cells coalesce, reject stale generations, and retire without wrapping" {
+    var cell: Notification.Cell = .{};
+    try std.testing.expect(cell.handle() == null);
+    try cell.activate();
+    const first = cell.handle().?;
+    try std.testing.expectEqual(Notification.Result.notified, first.signal());
+    try std.testing.expectEqual(Notification.Result.coalesced, first.signal());
+    try std.testing.expect(cell.consume());
+    try std.testing.expect(!cell.consume());
+    try std.testing.expectEqual(Notification.Result.notified, first.signal());
+    cell.deactivate();
+    try std.testing.expectEqual(Notification.Result.stale, first.signal());
+    try std.testing.expect(!cell.consume());
+    try cell.activate();
+    const second = cell.handle().?;
+    try std.testing.expect(first.generation != second.generation);
+    try std.testing.expectEqual(Notification.Result.stale, first.signal());
+    try std.testing.expect(!cell.consume());
+    try std.testing.expectEqual(Notification.Result.notified, second.signal());
+    cell.deactivate();
+    cell.state.store(std.math.maxInt(u64) & ~@as(u64, 3), .release);
+    try std.testing.expectError(error.NotificationGenerationExhausted, cell.activate());
+    try std.testing.expect(cell.handle() == null);
+    try std.testing.expectEqual(Notification.Result.stale, second.signal());
+}
+
+test "concurrent producers publish one coalesced notification" {
+    const Producer = struct {
+        handle: Notification,
+        result: Notification.Result = .stale,
+        fn run(self: *@This()) void {
+            self.result = self.handle.signal();
+        }
+    };
+    var cell: Notification.Cell = .{};
+    try cell.activate();
+    var producers: [8]Producer = @splat(.{ .handle = cell.handle().? });
+    var threads: [8]std.Thread = undefined;
+    var started: usize = 0;
+    {
+        defer for (threads[0..started]) |thread| thread.join();
+        for (&threads, &producers) |*thread, *producer| {
+            thread.* = try std.Thread.spawn(.{}, Producer.run, .{producer});
+            started += 1;
+        }
+    }
+    var notified: usize = 0;
+    for (producers) |producer| {
+        try std.testing.expect(producer.result != .stale);
+        if (producer.result == .notified) notified += 1;
+    }
+    try std.testing.expectEqual(@as(usize, 1), notified);
+    try std.testing.expect(cell.consume());
+    try std.testing.expect(!cell.consume());
+    cell.deactivate();
 }
