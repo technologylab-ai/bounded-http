@@ -158,6 +158,103 @@ def disconnect_after_flush(mode):
     final_counts(server)
 
 
+def notification_ordering_and_reuse(mode):
+    with Server(**shared_options(mode), stall_ms=10) as server:
+        with server.connect() as client:
+            reader = ResponseReader(client)
+            for index in range(8):
+                client.sendall(request(f'/notify-before/{index}'))
+                require(reader.response()[2] == b'notified', 'pending notification lost to immediate timer')
+                require(fetch(server, f'/signal/{index}')[2] == b'stale', 'finished request handle remained active')
+            client.sendall(request('/notify-timeout/8'))
+            require(reader.response()[2] == b'timer', 'notification timeout did not resume')
+        require(fetch(server, '/signal/8')[2] == b'stale', 'timer finish retained producer handle')
+        require(fetch(server, '/notify/0')[0] == 503, 'fixed fixture registry reused a published entry')
+        require(counts(server) == dict(started=9, finished=9, cancelled=0, live=0), 'notification finish accounting failed')
+    final_counts(server)
+
+
+def notification_many_waits(mode, shards=1):
+    options = shared_options(mode)
+    options['shards'] = shards
+    with Server(**options, stall_ms=10) as server:
+        with contextlib.ExitStack() as stack:
+            clients = [stack.enter_context(server.connect()) for _ in range(32)]
+            for index, client in enumerate(clients):
+                client.sendall(request(f'/notify/{index}'))
+            current = await_count(server, 'started', 32)
+            require(current['live'] == 32, 'notifications retained callback workers')
+            require(fetch(server, '/plaintext')[2] == b'Hello, World!', 'unrelated request stalled behind notification waits')
+            for index, client in enumerate(clients):
+                require(fetch(server, f'/signal/{index}')[2] == b'notified', 'producer signal failed')
+                require(ResponseReader(client).response()[2] == b'notified', 'producer failed to resume request')
+                require(fetch(server, f'/signal/{index}')[2] == b'stale', 'terminal signal was not rejected')
+        require(counts(server) == dict(started=32, finished=32, cancelled=0, live=0), 'notification finish accounting failed')
+    final_counts(server)
+
+
+def notification_pipeline_and_flush(mode):
+    with Server(**shared_options(mode), stall_ms=10) as server:
+        with server.connect() as client:
+            client.sendall(request('/plaintext') + request('/notify/0') + request('/plaintext'))
+            reader = ResponseReader(client)
+            require(reader.response()[2] == b'Hello, World!', 'notification wait retained previous pipeline response')
+            await_count(server, 'started', 1)
+            require(fetch(server, '/signal/0')[2] == b'notified', 'pipeline producer signal failed')
+            require(reader.response()[2] == b'notified', 'pipeline notification response missing')
+            require(reader.response()[2] == b'Hello, World!', 'pipeline suffix lost after notification')
+            client.sendall(request('/notify-flush/1'))
+            require(reader._line().startswith(b'HTTP/1.1 200 '), 'notification stream head missing')
+            while reader._line():
+                pass
+            size = int(reader._line(), 16)
+            require(reader._take(size) == b'start ', 'notification initial chunk changed')
+            require(reader._take(2) == b'\r\n', 'notification chunk terminator changed')
+            require(fetch(server, '/signal/1')[2] == b'notified', 'signal during flush failed')
+            size = int(reader._line(), 16)
+            require(reader._take(size) == b'notified', 'notification final chunk changed')
+            require(reader._take(2) == b'\r\n', 'notification final chunk terminator changed')
+            require(reader._line() == b'0' and reader._line() == b'', 'notification stream did not terminate')
+        require(counts(server) == dict(started=2, finished=2, cancelled=0, live=0), 'notification pipeline accounting failed')
+    final_counts(server)
+
+
+def notification_cancellation(mode):
+    options = shared_options(mode)
+    options['timeout_ms'] = 200
+    options['deadline_sweep_ms'] = 5
+    with Server(**options, stall_ms=10000) as server:
+        with server.connect() as client:
+            client.sendall(request('/notify/0'))
+            require(client.recv(1) == b'', 'request deadline did not cancel unbounded notification wait')
+        current = await_count(server, 'cancelled', 1)
+        require(current['live'] == 0, 'notification timeout did not release state')
+        require(fetch(server, '/signal/0')[2] == b'stale', 'cancelled handle remained active')
+        with server.connect() as client:
+            client.sendall(request('/notify-flush/1'))
+            reader = ResponseReader(client)
+            require(reader._line().startswith(b'HTTP/1.1 200 '), 'notification disconnect head missing')
+            while reader._line():
+                pass
+            size = int(reader._line(), 16)
+            require(reader._take(size) == b'start ', 'notification disconnect first chunk changed')
+            require(reader._take(2) == b'\r\n', 'notification disconnect chunk terminator changed')
+            import struct
+            client.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER,
+                              struct.pack('hh' if os.name == 'nt' else 'ii', 1, 0))
+        current = await_count(server, 'cancelled', 2)
+        require(current['live'] == 0, 'notification disconnect retained application state')
+        require(fetch(server, '/signal/1')[2] == b'stale', 'disconnected handle remained active')
+        with contextlib.ExitStack() as stack:
+            clients = [stack.enter_context(server.connect()) for _ in range(8)]
+            for index, client in enumerate(clients, 2):
+                client.sendall(request(f'/notify/{index}'))
+            await_count(server, 'started', 10)
+            server.request_stop()
+    current = final_counts(server)
+    require(current == dict(started=10, finished=0, cancelled=10, live=0), 'notification shutdown did not clean every request once')
+
+
 def sharded_timers():
     options = shared_options('inline')
     options['shards'] = 3
@@ -183,7 +280,9 @@ def main():
         SERVER_BINARY = args.server.resolve()
     results = []
     for mode in ('inline', 'workers'):
-        for test in (framing_and_reuse, many_waits, timeout_and_shutdown, disconnect_after_flush):
+        for test in (framing_and_reuse, many_waits, timeout_and_shutdown, disconnect_after_flush,
+                     notification_ordering_and_reuse, notification_many_waits,
+                     notification_pipeline_and_flush, notification_cancellation):
             started = time.monotonic()
             test(mode)
             result = dict(name=f'{test.__name__}/{mode}', passed=True, seconds=round(time.monotonic() - started, 3))
@@ -197,6 +296,14 @@ def main():
         sharded_timers()
         results.append(dict(name='sharded_timers/inline', passed=True, seconds=round(time.monotonic() - started, 3)))
         print('PASS sharded_timers/inline', flush=True)
+    started = time.monotonic()
+    if platform.system() == 'Darwin':
+        results.append(dict(name='sharded_notifications/inline', skipped='macOS engine supports one owner'))
+        print('SKIP sharded_notifications/inline: macOS engine supports one owner', flush=True)
+    else:
+        notification_many_waits('inline', shards=3)
+        results.append(dict(name='sharded_notifications/inline', passed=True, seconds=round(time.monotonic() - started, 3)))
+        print('PASS sharded_notifications/inline', flush=True)
     packet = dict(ok=True, groups=len(results), results=results)
     if args.json:
         args.json.write_text(json.dumps(packet, indent=2) + '\n')

@@ -270,6 +270,8 @@ const Slot = struct {
     notify_cancel: bool = false,
     resume_at: ?u64 = null,
     wait_delay_ns: ?u64 = null,
+    await_notification: bool = false,
+    notification: api.Notification.Cell = .{},
     /// A receive into the free input tail and a send of the frozen batch may
     /// be in flight together; each has its own cell and cancel cell.
     recv_pending: bool = false,
@@ -657,6 +659,7 @@ pub const Server = struct {
                     }
                 }
             }
+            try self.serviceNotifications();
             try self.serviceTimers();
             switch (self.config.execution) {
                 .inline_event_loop => {
@@ -701,6 +704,25 @@ pub const Server = struct {
         self.safe_to_destroy = true;
     }
 
+    /// Each connection supplies one startup-reserved notification cell.
+    /// A pending signal stays armed through callbacks and transport borrows.
+    fn serviceNotifications(self: *Server) !void {
+        for (self.slots, 0..) |*slot, index| {
+            if (!slot.in_use or slot.phase.load(.acquire) != .io or !slot.await_notification or slot.send_pending)
+                continue;
+            assert(slot.request_active);
+            if (slot.closing or self.stopping or self.now >= slot.deadline) {
+                if (!slot.closing and !self.stopping) self.stats.timeouts += 1;
+                try self.beginClose(slot);
+            } else if (slot.notification.consume()) {
+                slot.await_notification = false;
+                slot.resume_at = null;
+                slot.event = .notified;
+                self.dispatch(index);
+            }
+        }
+    }
+
     /// Timer storage belongs to slots. A due timer causes one bounded slot scan.
     fn serviceTimers(self: *Server) !void {
         const next = self.next_timer orelse return;
@@ -716,6 +738,7 @@ pub const Server = struct {
                 // The preceding batch still owns output. Completion rearms the timer.
             } else if (at <= self.now) {
                 slot.resume_at = null;
+                slot.await_notification = false;
                 slot.event = .timer;
                 self.dispatch(index);
             } else {
@@ -782,13 +805,14 @@ pub const Server = struct {
                 if (!self.stop_requested.load(.acquire)) self.stats.timeouts += 1;
                 try self.beginClose(slot);
             } else if (slot.action == .wait) {
-                const delay = slot.wait_delay_ns orelse {
+                if (slot.wait_delay_ns) |delay| {
+                    const at = nowNs() +| delay;
+                    slot.resume_at = at;
+                    self.next_timer = @min(self.next_timer orelse at, at);
+                } else if (!slot.await_notification) {
                     try self.beginClose(slot);
                     break;
-                };
-                const at = nowNs() +| delay;
-                slot.resume_at = at;
-                self.next_timer = @min(self.next_timer orelse at, at);
+                }
                 if (slot.batch_count != 0) {
                     // Initial waits cannot retain earlier finished responses in the arena.
                     assert(!slot.writer.began);
@@ -1127,12 +1151,14 @@ pub const Server = struct {
             });
         };
         if (parsed) {
+            slot.notification.activate() catch return self.beginClose(slot);
             slot.request_active = true;
             assert(slot.arena.len - slot.arena_used >= self.config.callback_output_reserve);
             slot.writer.open(slot.arena_used, slot.request.keep_alive, slot.request.head_only);
             slot.state = @splat(0);
             slot.notify_cancel = false;
             slot.resume_at = null;
+            slot.await_notification = false;
             slot.event = .request;
             slot.logical_written = 0;
             self.dispatch(index);
@@ -1242,6 +1268,7 @@ pub const Server = struct {
                 .application = self.application,
                 .cancelled = &slot.cancelled,
                 .notify_cancel = slot.notify_cancel,
+                .notification_cell = &slot.notification,
                 .blocking_flush = if (self.config.execution == .workers and slot.event != .cancelled) .{
                     .context = &streaming,
                     .flush = WorkerFlush.flush,
@@ -1253,12 +1280,16 @@ pub const Server = struct {
                 slot.action = .close;
                 slot.notify_cancel = false;
                 slot.wait_delay_ns = null;
+                slot.await_notification = false;
             } else {
                 slot.notify_cancel = context.notify_cancel and (slot.action == .flush or slot.action == .wait);
                 slot.wait_delay_ns = if (slot.action == .wait) context.resume_after_ns else null;
+                slot.await_notification = slot.action == .wait and context.await_notification;
                 if (slot.action != .close and slot.action != .wait) assert(slot.writer.frozen);
             }
         }
+        // Terminal callbacks release producer handles before publishing their result.
+        if (slot.action == .finish or slot.action == .close) slot.notification.deactivate();
         if (timing) slot.handler_ns = nowNs() - started;
         assert(slot.phase.load(.acquire) == .running);
         slot.phase.store(.result, .release);
@@ -1541,8 +1572,7 @@ pub const Server = struct {
             .resume_timer => {
                 assert(slot.request_active and !slot.writer.began);
                 slot.writer.open(0, slot.request.keep_alive, slot.request.head_only);
-                const at = slot.resume_at.?;
-                self.next_timer = @min(self.next_timer orelse at, at);
+                if (slot.resume_at) |at| self.next_timer = @min(self.next_timer orelse at, at);
             },
             .close => try self.beginClose(slot),
             .parse => {
@@ -1569,6 +1599,7 @@ pub const Server = struct {
         const index = (@intFromPtr(slot) - @intFromPtr(self.slots.ptr)) / @sizeOf(Slot);
         slot.closing = true;
         slot.resume_at = null;
+        slot.notification.deactivate();
         slot.cancelled.store(true, .release);
         if (slot.fd >= 0) self.backend.shutdown(slot.fd);
         if (slot.recv_pending and !slot.recv_cancel_pending) {
@@ -1729,6 +1760,8 @@ pub const Server = struct {
                 slot.in_use = true;
                 slot.request_active = true;
                 slot.state[0] = 42;
+                try slot.notification.activate();
+                const handle = slot.notification.handle().?;
                 slot.notify_cancel = true;
                 slot.writer.open(0, true, false);
                 server.header_cache.refresh("Sat, 05 Sep 2026 12:34:56 GMT");
@@ -1737,6 +1770,7 @@ pub const Server = struct {
                 slot.phase.store(.running, .release);
                 server.invokeHandler(slot);
                 try std.testing.expect(!slot.notify_cancel);
+                try std.testing.expectEqual(api.Notification.Result.stale, handle.signal());
                 try std.testing.expectEqual(Phase.result, slot.phase.load(.acquire));
                 try server.beginClose(slot);
                 try std.testing.expect(slot.in_use);
@@ -1850,6 +1884,71 @@ pub const Server = struct {
         slot.phase.store(.io, .release);
         try server.beginClose(slot);
         try std.testing.expect(!slot.in_use);
+    }
+
+    test "notifications retain signals through callbacks, timer waits, and preceding batches" {
+        const server = try Server.init(std.testing.allocator, .{
+            .execution = .inline_event_loop,
+            .workers = 0,
+            .connections = 1,
+            .port = 0,
+        }, struct {
+            fn handler(_: *api.Context) api.Action {
+                unreachable;
+            }
+        }.handler, null);
+        defer server.deinit();
+        const slot = &server.slots[0];
+        slot.in_use = true;
+        slot.request_active = true;
+        slot.request.keep_alive = true;
+        slot.request.head_only = false;
+        slot.deadline = 1000;
+        slot.writer.open(0, true, false);
+        server.stats.live_connections = 1;
+        server.free_count = 0;
+        server.now = 123;
+        try slot.notification.activate();
+        const handle = slot.notification.handle().?;
+        slot.phase.store(.running, .release);
+        try std.testing.expectEqual(api.Notification.Result.notified, handle.signal());
+        try server.serviceNotifications();
+        try std.testing.expectEqual(Phase.running, slot.phase.load(.acquire));
+        slot.phase.store(.io, .release);
+        slot.resume_at = 123;
+        server.next_timer = 123;
+        try server.serviceNotifications();
+        try server.serviceTimers();
+        try std.testing.expectEqual(api.Event.timer, slot.event);
+        try std.testing.expectEqual(api.Notification.Result.coalesced, handle.signal());
+        _ = server.popReady();
+        slot.phase.store(.io, .release);
+        slot.await_notification = true;
+        slot.resume_at = 123;
+        server.next_timer = 123;
+        slot.writer.frozen = true;
+        slot.batch_count = 1;
+        slot.cells[0] = .{ .finished = true };
+        slot.batch_next = .resume_timer;
+        slot.send_pending = true;
+        try server.serviceNotifications();
+        try server.serviceTimers();
+        try std.testing.expectEqual(Phase.io, slot.phase.load(.acquire));
+        try std.testing.expect(slot.writer.frozen);
+        slot.send_pending = false;
+        try server.completeBatch(0);
+        try server.serviceNotifications();
+        try server.serviceTimers();
+        try std.testing.expectEqual(api.Event.notified, slot.event);
+        try std.testing.expectEqual(Phase.ready, slot.phase.load(.acquire));
+        try std.testing.expect(slot.resume_at == null and !slot.await_notification);
+        try std.testing.expect(!slot.notification.consume());
+        try std.testing.expect(!slot.writer.frozen and !slot.writer.began);
+        _ = server.popReady();
+        slot.phase.store(.io, .release);
+        try server.beginClose(slot);
+        try std.testing.expect(!slot.in_use);
+        try std.testing.expectEqual(api.Notification.Result.stale, handle.signal());
     }
 
     test "cancelling a queued resume preserves one cancellation callback" {
