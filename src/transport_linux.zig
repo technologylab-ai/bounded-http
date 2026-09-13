@@ -35,6 +35,10 @@ pub const Backend = struct {
     transient_retries: u64 = 0,
 
     pub fn init(allocator: std.mem.Allocator, max_connections: u16, port_number: u16, reuse_port: bool) !Backend {
+        return initBound(allocator, max_connections, .{ 127, 0, 0, 1 }, port_number, reuse_port);
+    }
+
+    pub fn initBound(allocator: std.mem.Allocator, max_connections: u16, bind_address: [4]u8, port_number: u16, reuse_port: bool) !Backend {
         if (max_connections == 0 or max_connections > 16383) return error.InvalidConnectionLimit;
         const capacity = common.cellCount(max_connections);
         const entries = try std.math.ceilPowerOfTwo(u16, @intCast(capacity));
@@ -53,7 +57,7 @@ pub const Backend = struct {
         const operations = try allocator.alloc(Operation, capacity);
         errdefer allocator.free(operations);
         @memset(operations, .{});
-        const listener = try common.listen(port_number, max_connections, false, reuse_port);
+        const listener = try common.listenBound(bind_address, port_number, max_connections, false, reuse_port);
         errdefer common.closeFd(listener.socket);
         const result = linux.eventfd(0, linux.EFD.CLOEXEC | linux.EFD.NONBLOCK);
         if (linux.errno(result) != .SUCCESS) return error.WakeDescriptorFailed;

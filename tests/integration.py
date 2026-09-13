@@ -167,8 +167,8 @@ class Server:
         require(0 < self.port <= 65535, "invalid bound port")
         return self
 
-    def connect(self, timeout=3.0):
-        sock = socket.create_connection(("127.0.0.1", self.port), timeout=timeout)
+    def connect(self, timeout=3.0, host="127.0.0.1"):
+        sock = socket.create_connection((host, self.port), timeout=timeout)
         sock.settimeout(timeout)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         return sock
@@ -251,7 +251,75 @@ def expect_closed(sock):
         pass
 
 
+def run_binding_suite(binary, emit, sessions):
+    cases = [("default_loopback", None, "127.0.0.1", 1),
+             ("explicit_loopback", "127.0.0.1", "127.0.0.1", 1),
+             ("wildcard", "0.0.0.0", "127.0.0.1", 1)]
+    if sys.platform.startswith("linux") or os.name == "nt":
+        cases += [("sharded_loopback", "127.0.0.1", "127.0.0.1", 2),
+                  ("sharded_wildcard", "0.0.0.0", "127.0.0.1", 2)]
+    if sys.platform.startswith("linux"):
+        # Linux routes the complete 127/8 prefix locally without an interface alias.
+        # These clients would fail if the listener silently retained 127.0.0.1.
+        cases += [("specific_alternate_loopback", "127.0.0.2", "127.0.0.2", 2),
+                  ("wildcard_alternate_loopback", "0.0.0.0", "127.0.0.2", 2)]
+    close_request = b"GET /plaintext HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+    for name, address, host, shards in cases:
+        start = time.monotonic()
+        options = dict(connections=2, shards=shards, send_chunk=65536)
+        if address is not None:
+            options["bind_address"] = address
+        if shards > 1:
+            options.update(execution="inline", workers=0)
+        with Server(binary, **options) as server:
+            ready = next(line for line in server.lines if line.startswith("READY "))
+            require("bind_address=" + (address or "127.0.0.1") in ready,
+                    "listener address missing from READY")
+            with contextlib.ExitStack() as stack:
+                held = [stack.enter_context(server.connect(host=host)) for _ in range(2)]
+                readers = [ResponseReader(sock) for sock in held]
+                for sock, reader in zip(held, readers):
+                    sock.sendall(REQUEST)
+                    require(reader.response()[2] == PLAINTEXT, "configured listener did not serve HTTP")
+                # Each response acknowledges an admitted, live keepalive connection.
+                with server.connect(host=host) as extra:
+                    try:
+                        extra.sendall(REQUEST)
+                        expect_closed(extra)
+                    except (ConnectionResetError, ConnectionAbortedError):
+                        # Windows can report WSAECONNABORTED for a refused accepted socket.
+                        pass
+                for sock, reader in zip(held, readers):
+                    sock.sendall(close_request)
+                    require(reader.response()[2] == PLAINTEXT, "held connection lost its response")
+                    expect_closed(sock)
+            with server.connect(host=host) as recovered:
+                recovered.sendall(close_request)
+                require(ResponseReader(recovered).response()[2] == PLAINTEXT,
+                        "configured listener did not recover admission")
+                expect_closed(recovered)
+        require(server.stats["peak_connections"] == 2 and server.stats["rejected"] >= 1,
+                "configured listener did not preserve the shared connection ceiling")
+        require(server.stats["completed"] == 5, "configured listener lost or duplicated requests")
+        if os.name == "nt" and shards > 1:
+            require(server.stats["handoffs_received"] > 0,
+                    "configured Windows listener did not exercise destination handoff")
+        sessions.append(dict(phase="bind_" + name, backend=server.backend,
+                             options=options, client_address=host, stats=server.stats))
+        emit("bind_" + name + "_admission_and_recovery", time.monotonic() - start)
+
+    start = time.monotonic()
+    for invalid in ("", "localhost", "::1", "127.1", "127.0.0.1.2", "256.0.0.1",
+                    "127..0.1", "-1.0.0.1", "1_0.0.0.1", "127.0.0.1:8080"):
+        result = subprocess.run([str(binary), "--bind-address", invalid], cwd=ROOT,
+                                capture_output=True, timeout=8)
+        require(result.returncode != 0 and b"InvalidBindAddress" in result.stderr and
+                b"READY " not in result.stderr, "invalid bind address accepted: %r" % invalid)
+    emit("invalid_bind_address_rejected_before_startup", time.monotonic() - start)
+
+
 def run_suite(binary, emit, sessions):
+    run_binding_suite(binary, emit, sessions)
     with Server(binary) as server:
         def check(name, function):
             start = time.monotonic()

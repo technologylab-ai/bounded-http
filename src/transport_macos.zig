@@ -40,6 +40,10 @@ pub const Backend = struct {
     bound_port: u16,
 
     pub fn init(allocator: std.mem.Allocator, max_connections: u16, port_number: u16, reuse_port: bool) !Backend {
+        return initBound(allocator, max_connections, .{ 127, 0, 0, 1 }, port_number, reuse_port);
+    }
+
+    pub fn initBound(allocator: std.mem.Allocator, max_connections: u16, bind_address: [4]u8, port_number: u16, reuse_port: bool) !Backend {
         if (max_connections == 0 or max_connections > 16383) return error.InvalidConnectionLimit;
         const capacity = common.cellCount(max_connections);
         const operations = try allocator.alloc(Operation, capacity);
@@ -47,7 +51,7 @@ pub const Backend = struct {
         @memset(operations, .{});
         const ready = try allocator.alloc(u32, capacity);
         errdefer allocator.free(ready);
-        const listener = try common.listen(port_number, max_connections, true, reuse_port);
+        const listener = try common.listenBound(bind_address, port_number, max_connections, true, reuse_port);
         errdefer common.closeFd(listener.socket);
         const queue = c.kqueue();
         if (queue < 0) return error.KqueueFailed;

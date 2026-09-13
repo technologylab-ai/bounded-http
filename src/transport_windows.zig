@@ -171,21 +171,29 @@ pub const Backend = struct {
     }
 
     pub fn init(allocator: std.mem.Allocator, max_connections: u16, port_number: u16, reuse_port: bool) !Backend {
+        return initBound(allocator, max_connections, .{ 127, 0, 0, 1 }, port_number, reuse_port);
+    }
+
+    pub fn initBound(allocator: std.mem.Allocator, max_connections: u16, bind_address: [4]u8, port_number: u16, reuse_port: bool) !Backend {
         if (reuse_port) return error.ReusePortUnsupported;
-        return initMode(allocator, max_connections, port_number, .direct);
+        return initMode(allocator, max_connections, bind_address, port_number, .direct);
     }
 
     /// The listener owns acceptance. The collected socket awaits its first association.
     pub fn initAcceptor(allocator: std.mem.Allocator, max_connections: u16, port_number: u16) !Backend {
-        return initMode(allocator, max_connections, port_number, .acceptor);
+        return initAcceptorBound(allocator, max_connections, .{ 127, 0, 0, 1 }, port_number);
+    }
+
+    pub fn initAcceptorBound(allocator: std.mem.Allocator, max_connections: u16, bind_address: [4]u8, port_number: u16) !Backend {
+        return initMode(allocator, max_connections, bind_address, port_number, .acceptor);
     }
 
     /// Creates a destination port without binding or opening a listener socket.
     pub fn initDestination(allocator: std.mem.Allocator, max_connections: u16) !Backend {
-        return initMode(allocator, max_connections, 0, .destination);
+        return initMode(allocator, max_connections, .{ 127, 0, 0, 1 }, 0, .destination);
     }
 
-    fn initMode(allocator: std.mem.Allocator, max_connections: u16, port_number: u16, mode: Mode) !Backend {
+    fn initMode(allocator: std.mem.Allocator, max_connections: u16, bind_address: [4]u8, port_number: u16, mode: Mode) !Backend {
         if (max_connections == 0 or max_connections > 16383) return error.InvalidConnectionLimit;
         var wsa_data: WsaData = undefined;
         if (win32.WSAStartup(0x0202, &wsa_data) != 0) return error.WinsockStartupFailed;
@@ -214,7 +222,7 @@ pub const Backend = struct {
         const one: i32 = 1;
         // No SO_REUSEADDR: Windows interprets that option differently from POSIX.
         if (win32.setsockopt(listener, ws.SOL.SOCKET, ~@as(i32, ws.SO.REUSEADDR), &one, @sizeOf(i32)) != 0) return error.SocketOptionFailed;
-        var address: ws.sockaddr.in = .{ .port = std.mem.nativeToBig(u16, port_number), .addr = std.mem.nativeToBig(u32, 0x7f000001) };
+        var address: ws.sockaddr.in = .{ .port = std.mem.nativeToBig(u16, port_number), .addr = @bitCast(bind_address) };
         if (win32.bind(listener, @ptrCast(&address), @sizeOf(@TypeOf(address))) != 0) return error.BindFailed;
         if (win32.listen(listener, @intCast(max_connections)) != 0) return error.ListenFailed;
         var length: i32 = @sizeOf(@TypeOf(address));
@@ -934,4 +942,30 @@ test "IOCP startup worker wakes the owner without borrowing a caller token" {
     const started = win32.GetTickCount64();
     try std.testing.expectEqual(@as(usize, 0), try backend.poll(&out, 1000));
     try std.testing.expect(win32.GetTickCount64() - started < 900);
+}
+
+test "IOCP direct and acceptor listeners bind the configured IPv4 address" {
+    for ([_]bool{ false, true }) |acceptor| {
+        for ([_][4]u8{ .{ 0, 0, 0, 0 }, .{ 127, 0, 0, 1 } }) |expected| {
+            var backend = if (acceptor)
+                try Backend.initAcceptorBound(std.testing.allocator, 1, expected, 0)
+            else
+                try Backend.initBound(std.testing.allocator, 1, expected, 0, false);
+            defer backend.deinit();
+            var address: ws.sockaddr.in = undefined;
+            var length: i32 = @sizeOf(@TypeOf(address));
+            try std.testing.expectEqual(@as(i32, 0), win32.getsockname(backend.listener, @ptrCast(&address), &length));
+            try std.testing.expectEqual(expected, @as([4]u8, @bitCast(address.addr)));
+            try std.testing.expect(backend.port() != 0);
+        }
+        var default = if (acceptor)
+            try Backend.initAcceptor(std.testing.allocator, 1, 0)
+        else
+            try Backend.init(std.testing.allocator, 1, 0, false);
+        defer default.deinit();
+        var address: ws.sockaddr.in = undefined;
+        var length: i32 = @sizeOf(@TypeOf(address));
+        try std.testing.expectEqual(@as(i32, 0), win32.getsockname(default.listener, @ptrCast(&address), &length));
+        try std.testing.expectEqual([4]u8{ 127, 0, 0, 1 }, @as([4]u8, @bitCast(address.addr)));
+    }
 }

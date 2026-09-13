@@ -32,6 +32,8 @@ pub const Config = struct {
     /// Finished responses retained per connection before a drain; each is a
     /// range of the connection's output arena plus an optional borrowed span.
     response_batch_limit: u16 = 128,
+    /// IPv4 listener octets. Wildcard 0.0.0.0 listens on all IPv4 interfaces.
+    bind_address: [4]u8 = .{ 127, 0, 0, 1 },
     port: u16 = 8080,
     connections: u16 = 128,
     workers: u16 = 0,
@@ -78,6 +80,20 @@ pub const Config = struct {
     reuse_port: bool = false,
 
     pub const max_callbacks_per_turn_auto: u32 = 8192;
+
+    /// Parse four decimal IPv4 octets at startup. No allocation or name lookup.
+    pub fn parseBindAddress(text: []const u8) error{InvalidBindAddress}![4]u8 {
+        var address: [4]u8 = undefined;
+        var octets = std.mem.splitScalar(u8, text, '.');
+        for (&address) |*octet| {
+            const part = octets.next() orelse return error.InvalidBindAddress;
+            if (part.len == 0 or part.len > 3) return error.InvalidBindAddress;
+            for (part) |digit| if (digit < '0' or digit > '9') return error.InvalidBindAddress;
+            octet.* = std.fmt.parseInt(u8, part, 10) catch return error.InvalidBindAddress;
+        }
+        if (octets.next() != null) return error.InvalidBindAddress;
+        return address;
+    }
 
     pub fn wireBytes(self: Config) !usize {
         const body = try std.math.mul(usize, self.max_body, 2);
@@ -445,10 +461,10 @@ pub const Server = struct {
         const self = try allocator.create(Server);
         errdefer allocator.destroy(self);
         var backend = if (builtin.os.tag == .windows) switch (accept_mode) {
-            .direct => try transport.Backend.init(allocator, config.connections, config.port, config.reuse_port),
-            .distribute => try transport.Backend.initAcceptor(allocator, config.connections, config.port),
+            .direct => try transport.Backend.initBound(allocator, config.connections, config.bind_address, config.port, config.reuse_port),
+            .distribute => try transport.Backend.initAcceptorBound(allocator, config.connections, config.bind_address, config.port),
             .receive => try transport.Backend.initDestination(allocator, config.connections),
-        } else try transport.Backend.init(allocator, config.connections, config.port, config.reuse_port);
+        } else try transport.Backend.initBound(allocator, config.connections, config.bind_address, config.port, config.reuse_port);
         errdefer backend.deinit();
         if (config.gather_send) try backend.enableGather();
         const slots = try allocator.alloc(Slot, config.connections);
@@ -2701,6 +2717,18 @@ fn vectorsOf(comptime strings: anytype) [strings.len]c.iovec_const {
 
 fn vectorString(vec: c.iovec_const) []const u8 {
     return vec.base[0..vec.len];
+}
+
+test "bind address parsing accepts only four bounded decimal octets" {
+    try std.testing.expectEqual([4]u8{ 127, 0, 0, 1 }, (Config{}).bind_address);
+    try std.testing.expectEqual([4]u8{ 0, 0, 0, 0 }, try Config.parseBindAddress("0.0.0.0"));
+    try std.testing.expectEqual([4]u8{ 192, 168, 1, 255 }, try Config.parseBindAddress("192.168.1.255"));
+    try std.testing.expectEqual([4]u8{ 127, 0, 0, 1 }, try Config.parseBindAddress("127.000.0.001"));
+    for ([_][]const u8{ "", "localhost", "::1", "127.1", "127.0.0", "127.0.0.1.2", "127..0.1", ".127.0.1", "127.0.0.", "256.0.0.1", "-1.0.0.1", "+1.0.0.1", "1_0.0.0.1", "0x7f.0.0.1", "127.0.0.1 ", " 127.0.0.1", "0000.0.0.1", "127.0.0.1:8080" }) |invalid| {
+        try std.testing.expectError(error.InvalidBindAddress, Config.parseBindAddress(invalid));
+    }
+    const configured: Config = .{ .bind_address = .{ 192, 168, 1, 2 } };
+    try std.testing.expectEqual(configured.bind_address, Cluster.shardConfig(configured, 2, 1, 8080).bind_address);
 }
 
 test "configuration rejects combined resource overcommit and impossible worker limits" {

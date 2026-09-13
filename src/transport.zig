@@ -52,7 +52,13 @@ pub fn setSendBuffer(backend: *Backend, socket: Socket, bytes: u32) !void {
 // framework connection admission; it cannot establish application admission.
 // With `reuse_port`, several owners may bind the same address; on Linux the
 // kernel distributes connections across them.
-pub fn listen(port_number: u16, max_connections: u16, nonblocking: bool, reuse_port: bool) !struct { socket: Socket, port: u16 } {
+const Listener = struct { socket: Socket, port: u16 };
+
+pub fn listen(port_number: u16, max_connections: u16, nonblocking: bool, reuse_port: bool) !Listener {
+    return listenBound(.{ 127, 0, 0, 1 }, port_number, max_connections, nonblocking, reuse_port);
+}
+
+pub fn listenBound(bind_address: [4]u8, port_number: u16, max_connections: u16, nonblocking: bool, reuse_port: bool) !Listener {
     if (max_connections == 0 or max_connections > 16383) return error.InvalidConnectionLimit;
     const fd = c.socket(c.AF.INET, c.SOCK.STREAM, 0);
     if (fd < 0) return error.SocketFailed;
@@ -65,7 +71,7 @@ pub fn listen(port_number: u16, max_connections: u16, nonblocking: bool, reuse_p
     }
     var address: c.sockaddr.in = .{
         .port = std.mem.nativeToBig(u16, port_number),
-        .addr = std.mem.nativeToBig(u32, 0x7f000001),
+        .addr = @bitCast(bind_address),
     };
     if (c.bind(fd, @ptrCast(&address), @sizeOf(@TypeOf(address))) != 0) return error.BindFailed;
     if (c.listen(fd, @intCast(max_connections)) != 0) return error.ListenFailed;
@@ -284,4 +290,23 @@ test "two reuse-port listeners share one loopback port" {
     var second = try Backend.init(std.testing.allocator, 1, first.port(), true);
     defer second.deinit();
     try std.testing.expectEqual(first.port(), second.port());
+}
+
+test "listener binds the configured IPv4 address and preserves loopback default" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    var address: c.sockaddr.in = undefined;
+    for ([_][4]u8{ .{ 0, 0, 0, 0 }, .{ 127, 0, 0, 1 } }) |expected| {
+        const configured = try listenBound(expected, 0, 1, true, false);
+        defer closeFd(configured.socket);
+        var length: c.socklen_t = @sizeOf(@TypeOf(address));
+        try std.testing.expectEqual(@as(c_int, 0), c.getsockname(configured.socket, @ptrCast(&address), &length));
+        try std.testing.expectEqual(expected, @as([4]u8, @bitCast(address.addr)));
+        try std.testing.expect(configured.port != 0);
+    }
+
+    const default = try listen(0, 1, true, false);
+    defer closeFd(default.socket);
+    var length: c.socklen_t = @sizeOf(@TypeOf(address));
+    try std.testing.expectEqual(@as(c_int, 0), c.getsockname(default.socket, @ptrCast(&address), &length));
+    try std.testing.expectEqual(std.mem.nativeToBig(u32, 0x7f000001), address.addr);
 }
