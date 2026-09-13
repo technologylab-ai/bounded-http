@@ -45,7 +45,7 @@ This is the M4 implementation informed by the adjacent
 
 The first goal is a working ownership and pending/resume model that we can
 measure and change. This is not a production qualification or a TechEmpower
-ranking. It listens on **IPv4 loopback only**, speaks plain HTTP/1.1, and has no
+ranking. It defaults to **IPv4 loopback**, accepts explicit IPv4 binding, speaks plain HTTP/1.1, and has no
 TLS, proxy protocol, upgrade/tunnel implementation or general file server.
 
 Run these commands from the repository root with the exact `zig` compiler on
@@ -63,12 +63,26 @@ zig build -Doptimize=ReleaseSafe
 On Windows, use `.\zig-out\bin\bounded-http.exe` from PowerShell.
 Windows defaults to one I/O shard; `--shards 3` enables three independent IOCP owners.
 One listener distributes socket ownership through startup-bounded queues.
+Choose an IPv4 listener address explicitly for LAN clients:
+
+```sh
+./zig-out/bin/bounded-http --bind-address 0.0.0.0 --port 8080 --connections 128
+```
+
+`0.0.0.0` binds all IPv4 interfaces. A specific local IPv4 address binds only that address.
+Clients connect to the host's actual address, not `0.0.0.0`.
+The CLI accepts four decimal octets, with no hostname lookup or IPv6 parsing.
+Embedded applications set `Config.bind_address = .{ 0, 0, 0, 0 }`.
+`Config.parseBindAddress(text)` provides the same allocation-free startup parser.
+The default remains `127.0.0.1`. Binding does not change connection limits, resource budgets, or backpressure.
+Linux shard listeners and the Windows acceptor receive the same configured address.
+
 See the [architecture guide](docs/ARCHITECTURE.md#windows-socket-handoff) and [native shard receipt](reports/2026-09-06-windows-shards.md).
 
 The version must print `0.16.0`. The server prints `READY` to stderr after
 startup. Linux and macOS accept SIGINT or SIGTERM; Windows consoles accept Ctrl-C or Ctrl-Break.
 `--duration-ms 30000` requests
-shutdown after a finite run. `--port 0` asks the OS for an available loopback
+shutdown after a finite run. `--port 0` asks the OS for an available
 port, reported in `READY`. The HTML file is loaded before serving starts.
 
 | Route | Behavior |

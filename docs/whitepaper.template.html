@@ -51,7 +51,7 @@
 <li><a href="#macos-io"><span class="backend-platform">macOS</span><strong>kqueue</strong><span class="backend-mode">Nonblocking sockets</span></a></li>
 <li><a href="#windows-io"><span class="backend-platform">Windows</span><strong>IOCP</strong><span class="backend-mode">Overlapped operations</span></a></li>
 </ul>
-<p class="scope"><span class="pill">EXACT ZIG 0.16.0</span><span class="pill">ASSERTIONS ENABLED</span><span class="pill">LOOPBACK EXPERIMENT</span></p>
+<p class="scope"><span class="pill">EXACT ZIG 0.16.0</span><span class="pill">ASSERTIONS ENABLED</span><span class="pill">EXPERIMENTAL HTTP/1.1</span></p>
 <div class="hero-art" aria-label="Default configuration and measured result">
 <div><strong>0</strong><span>Extra application threads<br>Default configuration</span></div>
 <div><strong>128</strong><span>Connections served<br>Default simultaneous limit</span></div>
@@ -227,7 +227,7 @@ zig build run -Doptimize=ReleaseSafe -- --port 8081 --duration-ms 30000</code></
 <tr><td>Ownership remains uncertain</td><td>The process terminates instead of freeing storage with outstanding borrows.</td></tr>
 <tr><td>An inline callback never returns</td><td>The framework cannot preempt that callback. An external watchdog must supervise a violating application.</td></tr>
 </tbody></table></div>
-<p>The current server binds IPv4 loopback and serves plain HTTP. Transport Layer Security (TLS) and production deployment qualification remain pending.</p>
+<p>The server defaults to IPv4 loopback and serves plain HTTP. Set <code>--bind-address 0.0.0.0</code> for all IPv4 interfaces, or select a specific local IPv4 address. Connection and memory limits still apply. Transport Layer Security (TLS) and production deployment qualification remain pending.</p>
 <p>The <a href="read.html?file=reports/2026-09-06-windows-shards.md">Windows shard receipt</a> records native x64 distribution, admission, and shutdown tests. Windows performance remains unmeasured.</p>
 <p>Winsock creates socket resources during admission. Fixed framework storage does not bound provider allocations or delayed kernel cleanup.</p>
 <p>Dynamic borrow-release notifications and per-request worker offload remain pending. Applications cannot safely invent those ownership mechanisms around the current API.</p>

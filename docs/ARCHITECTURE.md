@@ -7,7 +7,9 @@ macOS uses nonblocking sockets and `kqueue`.
 Windows uses overlapped sockets and an I/O completion port (IOCP), which delivers operation results to the owner.
 
 The server remains experimental.
-The listener accepts IPv4 loopback connections only.
+The listener defaults to IPv4 loopback.
+`Config.bind_address` selects another local IPv4 address or wildcard `0.0.0.0`.
+The address is fixed at startup and does not change admission or storage bounds.
 The implementation has no Transport Layer Security (TLS), protocol upgrade, or tunnel support.
 See [using the server](USING.md) for embedding instructions.
 

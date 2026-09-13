@@ -504,3 +504,12 @@ A client can limit measured throughput.
 Closed-loop request measurements do not establish an open-loop latency guarantee.
 Use [recorded reports](../reports) for existing experiments and their exact scope.
 Use the [roadmap](../ROADMAP.md) to identify remaining qualification work.
+
+## Listener address
+
+`Config.bind_address` contains four IPv4 octets. The default is `.{ 127, 0, 0, 1 }`.
+Use `.{ 0, 0, 0, 0 }` for all IPv4 interfaces, or supply a specific local address.
+`Config.parseBindAddress(text)` parses four decimal octets without allocation or hostname lookup.
+The standalone CLI exposes this setting as `--bind-address A.B.C.D`.
+An unavailable local address fails at startup. Each shard uses the same address.
+Changing the address does not change connection admission, storage limits, or backpressure.

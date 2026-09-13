@@ -58,14 +58,16 @@ pub fn main(init: std.process.Init) !void {
     while (args.next()) |flag| {
         if (std.mem.eql(u8, flag, "--help")) {
             std.debug.print("bounded-http: bounded experimental Linux io_uring / macOS kqueue / Windows IOCP HTTP/1.1\n" ++
-                "--port N --connections N --execution workers|inline --workers N --max-body N --max-header N\n" ++
+                "--bind-address A.B.C.D --port N --connections N --execution workers|inline --workers N --max-body N --max-header N\n" ++
                 "--timeout-ms N --duration-ms N --send-chunk N --gather-send 0|1 --stall-ms N\n" ++
                 "--response-batch-limit N --socket-send-buffer N --output-bytes N --max-response N --memory-budget N --index FILE\n" ++
                 "--borrow-copy-threshold N --callbacks-per-turn N --callback-timing 0|1 --deadline-sweep-ms N --shards N\n", .{});
             return;
         }
         const value = args.next() orelse return error.MissingArgument;
-        if (std.mem.eql(u8, flag, "--port")) {
+        if (std.mem.eql(u8, flag, "--bind-address")) {
+            config.bind_address = try framework.Config.parseBindAddress(value);
+        } else if (std.mem.eql(u8, flag, "--port")) {
             config.port = try std.fmt.parseInt(u16, value, 10);
         } else if (std.mem.eql(u8, flag, "--connections")) {
             config.connections = try std.fmt.parseInt(u16, value, 10);
@@ -155,8 +157,9 @@ pub fn main(init: std.process.Init) !void {
     };
     try cluster.start();
     budget.sealed.store(true, .release);
-    std.debug.print("READY port={d} backend={s} connections={d} workers={d} execution={s} gather_send={d} response_batch_limit={d} shards={d} callbacks_per_turn={d} optimize={s}\n", .{
-        cluster.port(), framework.backend_name, config.connections, config.workers, @tagName(config.execution), @intFromBool(config.gather_send), config.effectiveBatchLimit(), shards, cluster.shards[0].stats.callbacks_per_turn, @tagName(@import("builtin").mode),
+    std.debug.print("READY port={d} backend={s} connections={d} workers={d} execution={s} gather_send={d} response_batch_limit={d} shards={d} callbacks_per_turn={d} optimize={s} bind_address={d}.{d}.{d}.{d}\n", .{
+        cluster.port(),         framework.backend_name, config.connections,     config.workers,         @tagName(config.execution), @intFromBool(config.gather_send), config.effectiveBatchLimit(), shards, cluster.shards[0].stats.callbacks_per_turn, @tagName(@import("builtin").mode),
+        config.bind_address[0], config.bind_address[1], config.bind_address[2], config.bind_address[3],
     });
     cluster.run() catch |err| {
         // A stuck callback or uncertain kernel submission still owns memory.
