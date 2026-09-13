@@ -59,8 +59,8 @@ Linux uses actual low-level io_uring accept/recv/send, runtime opcode probes,
 finite queues and explicit cancel drain. macOS uses nonblocking sockets/kqueue
 and the same completion interface.
 Windows uses overlapped `AcceptEx`, `WSARecv`, and `WSASend` through one completion port per owner.
-IPv4 loopback binding initially; CLI can
-expose other bind addresses later. No per-operation allocation.
+The listener defaults to IPv4 loopback. `Config.bind_address` selects another local IPv4 address or all IPv4 interfaces.
+The CLI exposes `--bind-address`. No operation allocates memory after startup.
 
 Gather vectors live in the caller's per-connection startup storage.
 Linux points its `msghdr` at those vectors.

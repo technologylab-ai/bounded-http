@@ -5,7 +5,8 @@ Use exact Zig 0.16.0, as specified by [.zig-version](../.zig-version).
 The framework has Linux, macOS, and Windows transport adapters.
 The [Windows receipt](../reports/2026-09-06-windows-iocp.md) records native verification and its exclusions.
 
-The current listener accepts plain HTTP/1.1 on IPv4 loopback only.
+The listener accepts plain HTTP/1.1 and defaults to IPv4 loopback.
+Use `Config.bind_address` to select a local IPv4 address or all IPv4 interfaces.
 The framework has no Transport Layer Security (TLS), general file server, protocol upgrade, or tunnel implementation.
 Treat the current API as experimental.
 
