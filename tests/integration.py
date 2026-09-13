@@ -286,7 +286,8 @@ def run_binding_suite(binary, emit, sessions):
                     try:
                         extra.sendall(REQUEST)
                         expect_closed(extra)
-                    except ConnectionResetError:
+                    except (ConnectionResetError, ConnectionAbortedError):
+                        # Windows can report WSAECONNABORTED for a refused accepted socket.
                         pass
                 for sock, reader in zip(held, readers):
                     sock.sendall(close_request)
