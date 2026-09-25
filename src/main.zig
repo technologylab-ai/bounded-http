@@ -41,6 +41,7 @@ const Demo = struct {
     html: []const u8,
     stall_ms: u32,
     execution: framework.Execution,
+    max_timeout_ms: u32 = 0,
     continuation_started: std.atomic.Value(u64) = .init(0),
     continuation_finished: std.atomic.Value(u64) = .init(0),
     continuation_cancelled: std.atomic.Value(u64) = .init(0),
@@ -59,7 +60,7 @@ pub fn main(init: std.process.Init) !void {
         if (std.mem.eql(u8, flag, "--help")) {
             std.debug.print("bounded-http: bounded experimental Linux io_uring / macOS kqueue / Windows IOCP HTTP/1.1\n" ++
                 "--bind-address A.B.C.D --port N --connections N --execution workers|inline --workers N --max-body N --max-header N\n" ++
-                "--timeout-ms N --duration-ms N --send-chunk N --gather-send 0|1 --stall-ms N\n" ++
+                "--timeout-ms N --max-timeout-ms N --duration-ms N --send-chunk N --gather-send 0|1 --stall-ms N\n" ++
                 "--response-batch-limit N --socket-send-buffer N --output-bytes N --max-response N --memory-budget N --index FILE\n" ++
                 "--borrow-copy-threshold N --callbacks-per-turn N --callback-timing 0|1 --deadline-sweep-ms N --shards N\n", .{});
             return;
@@ -82,6 +83,8 @@ pub fn main(init: std.process.Init) !void {
             config.max_header = try std.fmt.parseInt(u32, value, 10);
         } else if (std.mem.eql(u8, flag, "--timeout-ms")) {
             config.timeout_ms = try std.fmt.parseInt(u32, value, 10);
+        } else if (std.mem.eql(u8, flag, "--max-timeout-ms")) {
+            config.max_timeout_ms = try std.fmt.parseInt(u32, value, 10);
         } else if (std.mem.eql(u8, flag, "--duration-ms")) {
             config.duration_ms = try std.fmt.parseInt(u32, value, 10);
         } else if (std.mem.eql(u8, flag, "--send-chunk")) {
@@ -125,7 +128,7 @@ pub fn main(init: std.process.Init) !void {
     const shards = framework.Cluster.resolveShards(config);
     const html = try std.Io.Dir.cwd().readFileAlloc(init.io, index_path, init.gpa, .limited(65536));
     defer init.gpa.free(html);
-    var demo: Demo = .{ .html = html, .stall_ms = stall_ms, .execution = config.execution };
+    var demo: Demo = .{ .html = html, .stall_ms = stall_ms, .execution = config.execution, .max_timeout_ms = config.max_timeout_ms };
     var budget: framework.Budget = .{ .upstream = init.gpa, .limit_bytes = config.memory_budget_bytes - try framework.Cluster.stackBytes(config) };
     defer std.debug.assert(budget.live_bytes == 0);
     const cluster = try framework.Cluster.init(budget.allocator(), config, handler, &demo);
@@ -221,6 +224,7 @@ fn handle(context: *api.Context) !api.Action {
     if (std.mem.startsWith(u8, path, "/notify") or std.mem.startsWith(u8, path, "/signal/"))
         return notificationContinuation(context, demo, path);
     if (std.mem.eql(u8, path, "/timed-chunks") or std.mem.eql(u8, path, "/wait-only") or
+        std.mem.eql(u8, path, "/extended-wait-only") or
         std.mem.eql(u8, path, "/empty-timer") or std.mem.eql(u8, path, "/abort-after-flush"))
         return timedContinuation(context, demo, path);
     if (std.mem.eql(u8, context.request.method, "CONNECT")) {
@@ -391,6 +395,11 @@ fn timedContinuation(context: *api.Context, demo: *Demo, path: []const u8) !api.
         _ = demo.continuation_live.fetchAdd(1, .monotonic);
         _ = demo.continuation_started.fetchAdd(1, .release);
         context.requestCancellation();
+        if (std.mem.eql(u8, path, "/extended-wait-only")) {
+            // Select the configured maximum deadline for this request only.
+            try context.setRequestTimeout(demo.max_timeout_ms);
+            return context.wait(@as(u64, demo.stall_ms) * std.time.ns_per_ms);
+        }
         if (std.mem.eql(u8, path, "/wait-only")) return context.wait(@as(u64, demo.stall_ms) * std.time.ns_per_ms);
         try writer.begin(200, "text/plain", null);
         if (!std.mem.eql(u8, path, "/empty-timer")) {
@@ -405,7 +414,7 @@ fn timedContinuation(context: *api.Context, demo: *Demo, path: []const u8) !api.
         return context.wait(if (std.mem.eql(u8, path, "/empty-timer")) 0 else @as(u64, demo.stall_ms) * std.time.ns_per_ms);
     }
     std.debug.assert(context.event == .timer);
-    if (std.mem.eql(u8, path, "/wait-only")) {
+    if (std.mem.eql(u8, path, "/wait-only") or std.mem.eql(u8, path, "/extended-wait-only")) {
         try writer.begin(200, "text/plain", 4);
         try writer.borrow("done");
     } else if (std.mem.eql(u8, path, "/timed-chunks")) {

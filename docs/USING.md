@@ -304,6 +304,25 @@ Application work and scheduler load can add delay.
 The timer does not extend the original request deadline.
 A zero delay still yields through the scheduler.
 
+### Per-request deadlines
+
+`timeout_ms` is the default deadline for every request cycle.
+A long event stream needs a longer deadline than an ordinary request.
+Set `max_timeout_ms` to allow a callback to select a longer deadline.
+Then call `try context.setRequestTimeout(ms)` during any callback of that request.
+
+The new deadline is `ms` after the request started.
+The scheduler adopts the value when the callback returns or flushes.
+A value above `max_timeout_ms`, or zero, returns `InvalidRequestTimeout`.
+Without `max_timeout_ms`, the method returns `RequestTimeoutUnavailable`.
+Earlier unsent pipelined responses keep their deadline until their batch completes.
+The next request on the connection uses `timeout_ms` again.
+The idle keep-alive cycle after a finished request also uses `timeout_ms`.
+
+A long deadline holds one admitted connection for longer.
+It reserves no additional memory.
+Prefer `wait` or `waitNotification` for long streams, because they release the worker between events.
+
 Call `wait` before beginning a response, or after a completed flush with an empty output snapshot.
 The method rejects pending output, reservations, borrowed payloads, and cancellation.
 The scheduler drains earlier finished responses before waiting on a subsequent pipeline request.
@@ -410,6 +429,7 @@ The [architecture guide](ARCHITECTURE.md#resource-boundaries) explains which res
 | `max_response_bytes` | 16 MiB | Bound logical response bytes across flushes. |
 | `callbacks_per_turn` | 0, automatic | Bound inline callbacks per owner turn. |
 | `timeout_ms` | 5000 | Bound a request cycle while the owner can execute. |
+| `max_timeout_ms` | 0, disabled | Bound the deadline a callback can select with `setRequestTimeout`; at least `timeout_ms`, at most one day. |
 | `shutdown_ms` | 5000 | Bound shutdown coordination and drain waits. |
 | `memory_budget_bytes` | 512 MiB | Bound requested framework heap and startup stack reservations. |
 | `worker_stack_bytes` | 1 MiB | Reserve requested stack space for each worker and secondary owner. |
