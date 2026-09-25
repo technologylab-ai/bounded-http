@@ -60,7 +60,7 @@ pub fn main(init: std.process.Init) !void {
         if (std.mem.eql(u8, flag, "--help")) {
             std.debug.print("bounded-http: bounded experimental Linux io_uring / macOS kqueue / Windows IOCP HTTP/1.1\n" ++
                 "--bind-address A.B.C.D --port N --connections N --execution workers|inline --workers N --max-body N --max-header N\n" ++
-                "--timeout-ms N --max-timeout-ms N --duration-ms N --send-chunk N --gather-send 0|1 --stall-ms N\n" ++
+                "--timeout-ms N --max-timeout-ms N --idle-timeout-ms N --duration-ms N --send-chunk N --gather-send 0|1 --stall-ms N\n" ++
                 "--response-batch-limit N --socket-send-buffer N --output-bytes N --max-response N --memory-budget N --index FILE\n" ++
                 "--borrow-copy-threshold N --callbacks-per-turn N --callback-timing 0|1 --deadline-sweep-ms N --shards N\n", .{});
             return;
@@ -85,6 +85,8 @@ pub fn main(init: std.process.Init) !void {
             config.timeout_ms = try std.fmt.parseInt(u32, value, 10);
         } else if (std.mem.eql(u8, flag, "--max-timeout-ms")) {
             config.max_timeout_ms = try std.fmt.parseInt(u32, value, 10);
+        } else if (std.mem.eql(u8, flag, "--idle-timeout-ms")) {
+            config.idle_timeout_ms = try std.fmt.parseInt(u32, value, 10);
         } else if (std.mem.eql(u8, flag, "--duration-ms")) {
             config.duration_ms = try std.fmt.parseInt(u32, value, 10);
         } else if (std.mem.eql(u8, flag, "--send-chunk")) {

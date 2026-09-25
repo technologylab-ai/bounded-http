@@ -311,13 +311,22 @@ A long event stream needs a longer deadline than an ordinary request.
 Set `max_timeout_ms` to allow a callback to select a longer deadline.
 Then call `try context.setRequestTimeout(ms)` during any callback of that request.
 
-The new deadline is `ms` after the request started.
+The new deadline is `ms` after the request's first byte arrived.
 The scheduler adopts the value when the callback returns or flushes.
 A value above `max_timeout_ms`, or zero, returns `InvalidRequestTimeout`.
 Without `max_timeout_ms`, the method returns `RequestTimeoutUnavailable`.
 Earlier unsent pipelined responses keep their deadline until their batch completes.
 The next request on the connection uses `timeout_ms` again.
-The idle keep-alive cycle after a finished request also uses `timeout_ms`.
+
+### Idle connections
+
+A connection is idle while no request byte is buffered or active.
+This state lasts from accept to the first byte, and between keep-alive requests.
+`idle_timeout_ms` bounds that wait; zero selects `timeout_ms`.
+The first received byte ends the idle state and starts the request deadline.
+Idle time therefore never shortens the next request's deadline.
+Proxies such as `tailscale serve` reuse idle backend connections, so this matters for long streams.
+A slow client can use at most the idle bound plus the request bound per request.
 
 A long deadline holds one admitted connection for longer.
 It reserves no additional memory.
@@ -428,7 +437,8 @@ The [architecture guide](ARCHITECTURE.md#resource-boundaries) explains which res
 | `response_batch_limit` | 128 | Bound retained response snapshots; worker execution uses one. |
 | `max_response_bytes` | 16 MiB | Bound logical response bytes across flushes. |
 | `callbacks_per_turn` | 0, automatic | Bound inline callbacks per owner turn. |
-| `timeout_ms` | 5000 | Bound a request cycle while the owner can execute. |
+| `timeout_ms` | 5000 | Bound a request from its first received byte while the owner can execute. |
+| `idle_timeout_ms` | 0, same as `timeout_ms` | Bound the wait for a request's first byte, after accept and between keep-alive requests. |
 | `max_timeout_ms` | 0, disabled | Bound the deadline a callback can select with `setRequestTimeout`; at least `timeout_ms`, at most one day. |
 | `shutdown_ms` | 5000 | Bound shutdown coordination and drain waits. |
 | `memory_budget_bytes` | 512 MiB | Bound requested framework heap and startup stack reservations. |

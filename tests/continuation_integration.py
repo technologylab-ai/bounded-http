@@ -168,6 +168,58 @@ def extended_request_deadline(mode):
     final_counts(server)
 
 
+def idle_keep_alive_then_request(mode):
+    """Idle keep-alive time does not count toward the next request's deadline."""
+    options = shared_options(mode)
+    options['timeout_ms'] = 500
+    options['max_timeout_ms'] = 1000
+    options['deadline_sweep_ms'] = 5
+    with Server(**options, stall_ms=350) as server:
+        with server.connect(timeout=5) as client:
+            reader = ResponseReader(client)
+            client.sendall(request('/plaintext'))
+            require(reader.response()[0] == 200, 'first keep-alive request failed')
+            time.sleep(.3)
+            # Before the fix, the deadline counted from the idle start: 0.3 s + 0.35 s > 0.5 s.
+            client.sendall(request('/wait-only'))
+            status, _, body = reader.response()
+            require(status == 200 and body == b'done', 'idle time shortened the next request deadline')
+    # An extended deadline also counts from the request's first byte: 0.4 s + 0.7 s > 1 s.
+    with Server(**options, stall_ms=700) as server:
+        with server.connect(timeout=5) as client:
+            reader = ResponseReader(client)
+            client.sendall(request('/plaintext'))
+            require(reader.response()[0] == 200, 'first keep-alive request failed')
+            time.sleep(.4)
+            client.sendall(request('/extended-wait-only'))
+            status, _, body = reader.response()
+            require(status == 200 and body == b'done', 'idle time shortened the extended request deadline')
+    final_counts(server)
+
+
+def idle_timeout_is_separate(mode):
+    """idle_timeout_ms closes a quiet connection but never cuts an active request."""
+    options = shared_options(mode)
+    options['timeout_ms'] = 1000
+    options['idle_timeout_ms'] = 200
+    options['deadline_sweep_ms'] = 5
+    with Server(**options, stall_ms=500) as server:
+        with server.connect(timeout=5) as client:
+            started = time.monotonic()
+            require(client.recv(1) == b'', 'idle connection outlived idle_timeout_ms')
+            elapsed = time.monotonic() - started
+            require(.15 <= elapsed < .8, f'idle close after {elapsed:.3f}s')
+        with server.connect(timeout=5) as client:
+            reader = ResponseReader(client)
+            client.sendall(request('/wait-only'))
+            status, _, body = reader.response()
+            require(status == 200 and body == b'done', 'idle timeout cut an active request')
+            started = time.monotonic()
+            require(client.recv(1) == b'', 'kept-alive connection outlived idle_timeout_ms')
+            require(time.monotonic() - started < .8, 'idle timeout did not apply after a response')
+    final_counts(server)
+
+
 def disconnect_after_flush(mode):
     options = shared_options(mode)
     options['connections'] = 1
@@ -313,6 +365,7 @@ def main():
     results = []
     for mode in ('inline', 'workers'):
         for test in (framing_and_reuse, many_waits, timeout_and_shutdown, extended_request_deadline,
+                     idle_keep_alive_then_request, idle_timeout_is_separate,
                      disconnect_after_flush,
                      notification_ordering_and_reuse, notification_many_waits,
                      notification_pipeline_and_flush, notification_cancellation):
