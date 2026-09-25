@@ -42,7 +42,7 @@ pub fn main(init: std.process.Init) !void {
     cluster.run() catch |err| {
         // An uncertain run error can leave callbacks or kernel operations owning memory.
         std.debug.print("FATAL {s}; retained owners require process exit\n", .{@errorName(err)});
-        std.c._exit(70);
+        framework.failFast(70);
     };
     var stats = cluster.stats();
     stats.allocation_calls_after_start = budget.late_calls.load(.acquire);

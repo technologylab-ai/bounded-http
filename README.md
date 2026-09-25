@@ -17,6 +17,12 @@ While one connection waits for network progress, its owner can service other rea
 The framework reserves memory and threads before serving requests, with explicit connection, request, and response limits.
 The build target selects the native backend automatically.
 
+**No libc required on Linux.** The framework does not force libc on its consumers.
+On Linux it makes direct system calls ([src/sys.zig](src/sys.zig)) unless the
+application links libc itself, so a Linux build can be one static executable with
+no interpreter and no shared libraries, for any ABI (`-Dtarget=x86_64-linux-musl`,
+`-linux-none`, or the native default). macOS always links libSystem; Windows uses Win32.
+
 The repository and executable use `bounded-http`.
 The Zig package and module use `bounded_http`.
 The project was previously named `zig-http`.
@@ -126,7 +132,7 @@ To use the framework, import the `bounded_http` module exported by
 [build.zig](build.zig), provide an [api.Handler](src/api.zig), and follow the
 startup/run/stop lifecycle in [src/main.zig](src/main.zig). Its actual demo
 callback is the maintained example. [src/server.zig](src/server.zig) exposes
-`Config`, `Cluster`, `Server`, `api` and `Budget`; builds link libc. Treat this API as
+`Config`, `Cluster`, `Server`, `api` and `Budget`; Linux builds need no libc. Treat this API as
 experimental and read the [ownership contract](docs/OWNERSHIP.md) before
 retaining slices or adding asynchronous application work.
 

@@ -381,6 +381,7 @@ The framework cannot safely kill one arbitrary callback and reuse its borrowed m
 | [handoff.zig](../src/handoff.zig) | Fixed queues with exclusive socket ownership and acquire/release publication. |
 | [budget.zig](../src/budget.zig) | Framework allocator accounting and sealing. |
 | [transport.zig](../src/transport.zig) | Platform selection, common operation types, and listener setup. |
+| [sys.zig](../src/sys.zig) | The POSIX calls outside the Windows transport, with libc signatures: `std.c` when libc is linked, direct Linux system calls when it is not. |
 | [transport_linux.zig](../src/transport_linux.zig) | Linux completion adapter. |
 | [transport_macos.zig](../src/transport_macos.zig) | macOS readiness adapter with explicit completion reports. |
 | [transport_windows.zig](../src/transport_windows.zig) | Windows overlapped socket adapter with bounded IOCP records and cancellation drain. |
