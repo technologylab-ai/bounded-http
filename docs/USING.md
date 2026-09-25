@@ -71,7 +71,10 @@ The consumer obtains that module with `dependency.module("bounded_http")`.
 The consumer exposes it to its source as the `bounded_http` import.
 
 The example passes its selected target and optimization mode to the dependency.
-Its executable links libc.
+Its executable links no libc on Linux: the framework uses direct system calls there
+(see `sys.zig`), so the example builds as one static executable without an
+interpreter or shared libraries. An application that links libc for its own reasons
+gets the same framework calls through libc. macOS always links libSystem.
 The exported module is the framework entry point; the demo executable is not an embedding dependency.
 
 The example uses one shard and an immutable fixed response.

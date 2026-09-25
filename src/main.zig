@@ -287,7 +287,7 @@ fn handle(context: *api.Context) !api.Action {
             win32.Sleep(demo.stall_ms);
         } else {
             var remaining: std.c.timespec = .{ .sec = demo.stall_ms / 1000, .nsec = @as(isize, demo.stall_ms % 1000) * 1_000_000 };
-            while (std.c.nanosleep(&remaining, &remaining) != 0) {
+            while (framework.sys.nanosleep(&remaining, &remaining) != 0) {
                 if (context.cancelled.load(.acquire)) return .close;
             }
         }

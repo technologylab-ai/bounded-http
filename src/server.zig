@@ -1,6 +1,8 @@
 const std = @import("std");
 const c = std.c;
 const builtin = @import("builtin");
+/// POSIX calls with or without libc (see sys.zig).
+pub const sys = @import("sys.zig");
 const windows = std.os.windows;
 const win32 = struct {
     extern "kernel32" fn CreateEventW(?*anyopaque, i32, i32, ?[*:0]const u16) callconv(.winapi) ?windows.HANDLE;
@@ -367,7 +369,7 @@ const Worker = struct {
             return .{ .server = server, .index = index, .event = event };
         }
         var fds: [2]c.fd_t = undefined;
-        if (c.pipe(&fds) != 0) return error.WorkerPipeFailed;
+        if (sys.pipe(&fds) != 0) return error.WorkerPipeFailed;
         errdefer transport.closeFd(fds[0]);
         errdefer transport.closeFd(fds[1]);
         try transport.setFlags(fds[0], false);
@@ -389,8 +391,8 @@ const Worker = struct {
             return;
         }
         const byte = [_]u8{1};
-        const result = c.write(self.write_fd, &byte, 1);
-        if (result < 0) assert(c.errno(result) == .AGAIN or c.errno(result) == .INTR);
+        const result = sys.write(self.write_fd, &byte, 1);
+        if (result < 0) assert(sys.errno(result) == .AGAIN or sys.errno(result) == .INTR);
     }
     fn run(self: *Worker) void {
         _ = self.server.ready_workers.fetchAdd(1, .release);
@@ -416,15 +418,15 @@ const Worker = struct {
             assert(result == 0 or result == 258); // signaled or timeout
         } else {
             var ready = [_]c.pollfd{.{ .fd = self.read_fd, .events = c.POLL.IN, .revents = 0 }};
-            const polled = c.poll(&ready, 1, 10);
+            const polled = sys.poll(&ready, 1, 10);
             if (polled < 0) {
-                assert(c.errno(polled) == .INTR);
+                assert(sys.errno(polled) == .INTR);
                 return;
             }
             if (polled > 0) {
                 var bytes: [64]u8 = undefined;
-                const read = c.read(self.read_fd, &bytes, bytes.len);
-                assert(read > 0 or (read < 0 and c.errno(read) == .INTR));
+                const read = sys.read(self.read_fd, &bytes, bytes.len);
+                assert(read > 0 or (read < 0 and sys.errno(read) == .INTR));
             }
         }
     }
@@ -2428,7 +2430,7 @@ pub const Server = struct {
             break :seconds @intCast(@divFloor(@max(unix_100ns, 0), 10_000_000));
         } else seconds: {
             var ts: c.timespec = undefined;
-            assert(c.clock_gettime(.REALTIME, &ts) == 0);
+            assert(sys.clock_gettime(.REALTIME, &ts) == 0);
             break :seconds @intCast(@max(ts.sec, 0));
         };
         if (seconds == self.date_second) return;
@@ -2852,7 +2854,8 @@ pub fn failFast(code: u8) noreturn {
         if (win32.TerminateProcess(win32.GetCurrentProcess(), code) == 0) @trap();
         unreachable;
     }
-    std.c._exit(code);
+    // _exit semantics with or without libc (sys.exitNow).
+    sys.exitNow(code);
 }
 
 pub fn nowNs() u64 {
@@ -2865,7 +2868,7 @@ pub fn nowNs() u64 {
         return @intCast(@as(u128, @intCast(counter)) * std.time.ns_per_s / @as(u64, @intCast(frequency)));
     }
     var time: c.timespec = undefined;
-    assert(c.clock_gettime(.MONOTONIC, &time) == 0);
+    assert(sys.clock_gettime(.MONOTONIC, &time) == 0);
     return @as(u64, @intCast(time.sec)) * 1_000_000_000 + @as(u64, @intCast(time.nsec));
 }
 
@@ -3110,7 +3113,7 @@ const ClusterTestWatchdog = struct {
                 win32.Sleep(1);
             } else {
                 const delay: c.timespec = .{ .sec = 0, .nsec = 1_000_000 };
-                _ = c.nanosleep(&delay, null);
+                _ = sys.nanosleep(&delay, null);
             }
         }
     }

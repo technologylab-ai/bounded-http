@@ -5,6 +5,7 @@ const std = @import("std");
 const c = std.c;
 const linux = std.os.linux;
 const common = @import("transport.zig");
+const sys = @import("sys.zig");
 const Socket = common.Socket;
 const Completion = common.Completion;
 const assert = std.debug.assert;
@@ -176,8 +177,8 @@ pub const Backend = struct {
                 .{ .fd = self.ring.fd, .events = c.POLL.IN, .revents = 0 },
                 .{ .fd = self.wake_fd, .events = c.POLL.IN, .revents = 0 },
             };
-            const result = c.poll(&fds, fds.len, @intCast(timeout_ms));
-            if (result < 0 and c.errno(result) != .INTR) return error.PollFailed;
+            const result = sys.poll(&fds, fds.len, @intCast(timeout_ms));
+            if (result < 0 and sys.errno(result) != .INTR) return error.PollFailed;
             if (fds[1].revents & c.POLL.IN != 0) {
                 var value: u64 = undefined;
                 const read_result = linux.read(self.wake_fd, @ptrCast(&value), @sizeOf(u64));
@@ -243,7 +244,7 @@ pub const Backend = struct {
     }
 
     pub fn shutdown(_: *Backend, socket: Socket) void {
-        _ = c.shutdown(socket, c.SHUT.RDWR);
+        _ = sys.shutdown(socket, c.SHUT.RDWR);
     }
 
     pub fn port(self: *const Backend) u16 {

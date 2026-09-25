@@ -12,11 +12,12 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/server.zig"),
         .target = target,
         .optimize = optimize,
-        .link_libc = true,
+        // No forced libc: Linux uses direct system calls (src/sys.zig) unless the
+        // application links libc; macOS always links libSystem.
     });
     // Arch's GCC 16 CRT contains .sframe R_X86_64_PC64 relocations which
     // Zig 0.16's native ELF linker rejects. Use the bundled LLVM/LLD path
-    // for Linux Debug only. ReleaseSafe uses its default toolchain selection.
+    // for Linux Debug only; it matters only when an application links glibc.
     const exe = b.addExecutable(.{
         .use_llvm = if (target.result.os.tag == .linux and optimize == .Debug) true else null,
         .use_lld = if (target.result.os.tag == .linux and optimize == .Debug) true else null,
@@ -25,7 +26,6 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
-            .link_libc = true,
             .imports = &.{.{ .name = "bounded_http", .module = module }},
         }),
     });
@@ -50,7 +50,7 @@ pub fn build(b: *std.Build) void {
     b.step("example-check", "Compile and exercise the independent embedding project").dependOn(&embedding_check.step);
     verify.dependOn(&embedding_check.step);
     const test_step = b.step("test", "Run unit and transport tests");
-    for ([_][]const u8{ "src/http.zig", "src/api.zig", "src/budget.zig", "src/transport.zig", "src/server.zig" }) |path| {
+    for ([_][]const u8{ "src/http.zig", "src/api.zig", "src/budget.zig", "src/transport.zig", "src/server.zig", "src/sys.zig" }) |path| {
         const tests = b.addTest(.{ .use_llvm = if (target.result.os.tag == .linux and optimize == .Debug) true else null, .use_lld = if (target.result.os.tag == .linux and optimize == .Debug) true else null, .root_module = b.createModule(.{
             .root_source_file = b.path(path),
             .target = target,
@@ -61,5 +61,21 @@ pub fn build(b: *std.Build) void {
         const run_tests = b.addRunArtifact(tests);
         verify.dependOn(&run_tests.step);
         test_step.dependOn(&run_tests.step);
+    }
+    // Linux without libc: the same transport and server tests over direct
+    // system calls (src/sys.zig), as a libc-free application links them.
+    if (target.result.os.tag == .linux) {
+        for ([_][]const u8{ "src/transport.zig", "src/server.zig", "src/sys.zig" }) |path| {
+            const tests = b.addTest(.{ .name = "no-libc", .root_module = b.createModule(.{
+                .root_source_file = b.path(path),
+                .target = target,
+                .optimize = optimize,
+                .link_libc = false,
+            }) });
+            compile_only.dependOn(&tests.step);
+            const run_tests = b.addRunArtifact(tests);
+            verify.dependOn(&run_tests.step);
+            test_step.dependOn(&run_tests.step);
+        }
     }
 }
