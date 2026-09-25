@@ -79,6 +79,9 @@ pub const Context = struct {
     resume_after_ns: ?u64 = null,
     await_notification: bool = false,
     notification_cell: ?*Notification.Cell = null,
+    /// Scheduler-owned target for setRequestTimeout; null when Config.max_timeout_ms is zero.
+    requested_timeout_ms: ?*u32 = null,
+    max_timeout_ms: u32 = 0,
 
     /// Request one cancellation callback if this callback returns flush or wait.
     /// Cancellation runs on the configured application executor after kernel borrows end.
@@ -99,6 +102,18 @@ pub const Context = struct {
         self.resume_after_ns = delay_ns;
         self.await_notification = false;
         return .wait;
+    }
+
+    /// Replace this request's deadline with `timeout_ms` after the request started.
+    /// Config.max_timeout_ms bounds the value and must be nonzero to allow overrides.
+    /// The server adopts the value when this callback returns or flushes.
+    /// A later call in the same request replaces an earlier one. The next request
+    /// on the connection uses Config.timeout_ms again.
+    pub fn setRequestTimeout(self: *Context, timeout_ms: u32) error{ RequestTimeoutUnavailable, InvalidRequestTimeout, Cancelled }!void {
+        if (self.cancelled.load(.acquire)) return error.Cancelled;
+        const target = self.requested_timeout_ms orelse return error.RequestTimeoutUnavailable;
+        if (timeout_ms == 0 or timeout_ms > self.max_timeout_ms) return error.InvalidRequestTimeout;
+        target.* = timeout_ms;
     }
 
     /// Obtain a handle without retaining the callback context or request storage.
@@ -611,6 +626,37 @@ test "blocking flush rejects unavailable, cancelled and unpublished states witho
     try context.flushAndWait();
     try std.testing.expect(writer.frozen and called);
     try std.testing.expectError(error.InvalidState, context.flushAndWait());
+}
+
+test "request timeout overrides require a target, stay bounded and stop after cancellation" {
+    var arena: [1024]u8 = undefined;
+    const cache = testCache();
+    var writer = Writer.init(&arena, &cache, 0);
+    var request: http.Request = undefined;
+    var state: [8]usize = @splat(0);
+    var cancelled: std.atomic.Value(bool) = .init(false);
+    var context: Context = .{
+        .request = &request,
+        .writer = &writer,
+        .event = .request,
+        .state = &state,
+        .application = null,
+        .cancelled = &cancelled,
+    };
+    try std.testing.expectError(error.RequestTimeoutUnavailable, context.setRequestTimeout(1000));
+    var target: u32 = 0;
+    context.requested_timeout_ms = &target;
+    context.max_timeout_ms = 60_000;
+    try std.testing.expectError(error.InvalidRequestTimeout, context.setRequestTimeout(0));
+    try std.testing.expectError(error.InvalidRequestTimeout, context.setRequestTimeout(60_001));
+    try std.testing.expectEqual(@as(u32, 0), target);
+    try context.setRequestTimeout(60_000);
+    try std.testing.expectEqual(@as(u32, 60_000), target);
+    try context.setRequestTimeout(1);
+    try std.testing.expectEqual(@as(u32, 1), target);
+    cancelled.store(true, .release);
+    try std.testing.expectError(error.Cancelled, context.setRequestTimeout(2));
+    try std.testing.expectEqual(@as(u32, 1), target);
 }
 
 test "begin writes the head into the arena and flush keeps the snapshot" {

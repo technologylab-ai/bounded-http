@@ -70,6 +70,14 @@ pub const Config = struct {
     shard_affinity: bool = false,
     max_response_bytes: usize = 16 * 1024 * 1024,
     timeout_ms: u32 = 5000,
+    /// Largest request deadline a callback may select with
+    /// Context.setRequestTimeout, such as for a long event stream.
+    /// Zero disables the override. Otherwise at least timeout_ms, at most one day.
+    max_timeout_ms: u32 = 0,
+    /// Bound the wait for the first byte of a request: after accept, and
+    /// between keep-alive requests. Zero selects timeout_ms, the previous
+    /// single-deadline behavior. The request deadline starts at that first byte.
+    idle_timeout_ms: u32 = 0,
     shutdown_ms: u32 = 5000,
     duration_ms: u32 = 0,
     send_chunk: u32 = 65536,
@@ -80,6 +88,19 @@ pub const Config = struct {
     reuse_port: bool = false,
 
     pub const max_callbacks_per_turn_auto: u32 = 8192;
+    /// Upper bound for max_timeout_ms: one day.
+    pub const max_timeout_limit_ms: u32 = 24 * 60 * 60 * 1000;
+
+    /// The request deadline that applies without a callback override.
+    pub fn defaultTimeoutNs(self: Config) u64 {
+        return @as(u64, self.timeout_ms) * std.time.ns_per_ms;
+    }
+
+    /// The wait allowed for the first byte of the next request.
+    pub fn idleTimeoutNs(self: Config) u64 {
+        const ms = if (self.idle_timeout_ms == 0) self.timeout_ms else self.idle_timeout_ms;
+        return @as(u64, ms) * std.time.ns_per_ms;
+    }
 
     /// Parse four decimal IPv4 octets at startup. No allocation or name lookup.
     pub fn parseBindAddress(text: []const u8) error{InvalidBindAddress}![4]u8 {
@@ -148,6 +169,8 @@ pub const Config = struct {
             self.response_batch_limit == 0 or self.response_batch_limit > 511 or
             self.borrow_copy_threshold > 4096 or self.callbacks_per_turn > 1 << 20 or
             self.deadline_sweep_ms == 0 or self.deadline_sweep_ms > 1000 or self.shards > 64 or
+            (self.max_timeout_ms != 0 and (self.max_timeout_ms < self.timeout_ms or self.max_timeout_ms > max_timeout_limit_ms)) or
+            self.idle_timeout_ms > max_timeout_limit_ms or
             self.submit_batch > 4096)
             return error.InvalidConfiguration;
         assert(self.maxSendParts() <= transport.max_vectors);
@@ -302,6 +325,15 @@ const Slot = struct {
     batch_borrows_input: bool = false,
     closing: bool = false,
     deadline: u64 = 0,
+    /// Deadline length of the current request: the configured default, or
+    /// a callback's bounded Context.setRequestTimeout value.
+    timeout_ns: u64 = 0,
+    /// Written by the running callback, read by the owner after the phase
+    /// release that publishes the callback's result or stream snapshot. Zero is none.
+    requested_timeout_ms: u32 = 0,
+    /// No request byte is buffered or active: the idle deadline applies, and
+    /// the next received byte starts the request deadline.
+    idle: bool = false,
     request_started: u64 = 0,
     queued_at: u64 = 0,
     queue_ns: u64 = 0,
@@ -524,6 +556,7 @@ pub const Server = struct {
                     .max_target_bytes = 8192,
                 }),
                 .writer = api.Writer.init(arena, &self.header_cache, config.borrow_copy_threshold),
+                .timeout_ns = config.defaultTimeoutNs(),
             };
             @memset(slot.cells, .{});
             // Higher slots go in first so accept pops the lowest free index.
@@ -801,6 +834,7 @@ pub const Server = struct {
                 // The worker still owns its stack, request and application state.
                 // Only the frozen writer snapshot transfers to the I/O owner.
                 slot.phase.store(.stream_wait, .release);
+                self.applyRequestedTimeout(slot);
                 if (slot.closing or self.stop_requested.load(.acquire) or self.now >= slot.deadline) {
                     if (!slot.closing and !self.stop_requested.load(.acquire)) self.stats.timeouts += 1;
                     try self.beginClose(slot);
@@ -815,6 +849,7 @@ pub const Server = struct {
                 self.stats.max_queue_ns = @max(self.stats.max_queue_ns, slot.queue_ns);
             }
             slot.phase.store(.io, .release);
+            self.applyRequestedTimeout(slot);
             if (slot.closing or slot.action == .close) {
                 try self.beginClose(slot);
             } else if (self.stop_requested.load(.acquire) or self.now >= slot.deadline) {
@@ -912,7 +947,7 @@ pub const Server = struct {
         // Refresh once per adoption, including during a full queue drain.
         // Request callbacks continue to use the existing turn-clock policy.
         self.sampleClock();
-        const deadline = value.accepted_at + @as(u64, self.config.timeout_ms) * 1_000_000;
+        const deadline = value.accepted_at + self.config.idleTimeoutNs();
         self.stats.max_handoff_delay_ns = @max(self.stats.max_handoff_delay_ns, self.now - value.accepted_at);
         if (self.stop_requested.load(.acquire) or self.now >= deadline) {
             value.socket.close();
@@ -994,7 +1029,10 @@ pub const Server = struct {
         slot.parser.reset();
         slot.interim_sent = false;
         slot.logical_written = 0;
-        slot.deadline = accepted_at + @as(u64, self.config.timeout_ms) * 1_000_000;
+        slot.timeout_ns = self.config.defaultTimeoutNs();
+        slot.requested_timeout_ms = 0;
+        slot.idle = true;
+        slot.deadline = accepted_at + self.config.idleTimeoutNs();
         slot.request_started = accepted_at;
         self.stats.accepted += 1;
         self.stats.live_connections += 1;
@@ -1089,6 +1127,13 @@ pub const Server = struct {
                 assert(transferred <= slot.input.len - slot.received);
                 slot.received += transferred;
                 self.stats.bytes_received += transferred;
+                if (slot.idle) {
+                    // The first byte of a request ends the idle wait and
+                    // starts that request's own deadline.
+                    slot.idle = false;
+                    slot.request_started = self.now;
+                    slot.deadline = self.now + slot.timeout_ns;
+                }
                 // Bytes that arrive while a batch is still being sent, or while
                 // a flushed request waits to resume, are parsed after that batch.
                 if (!slot.send_pending and slot.batch_count == 0 and !slot.request_active)
@@ -1222,6 +1267,20 @@ pub const Server = struct {
         try self.receive(index);
     }
 
+    /// Adopt a callback's Context.setRequestTimeout value after its result or
+    /// stream snapshot is published. The new deadline counts from the request
+    /// start. Earlier unsent pipelined responses keep their deadline; the new
+    /// one applies when their batch completes.
+    fn applyRequestedTimeout(self: *Server, slot: *Slot) void {
+        const ms = slot.requested_timeout_ms;
+        if (ms == 0) return;
+        slot.requested_timeout_ms = 0;
+        assert(self.config.max_timeout_ms != 0 and ms <= self.config.max_timeout_ms);
+        if (!slot.request_active) return;
+        slot.timeout_ns = @as(u64, ms) * std.time.ns_per_ms;
+        if (slot.batch_count == 0) slot.deadline = slot.request_started + slot.timeout_ns;
+    }
+
     fn dispatch(self: *Server, index: usize) void {
         const slot = &self.slots[index];
         assert(slot.phase.load(.acquire) == .io and !slot.closing and !slot.send_pending);
@@ -1285,6 +1344,8 @@ pub const Server = struct {
                 .cancelled = &slot.cancelled,
                 .notify_cancel = slot.notify_cancel,
                 .notification_cell = &slot.notification,
+                .requested_timeout_ms = if (self.config.max_timeout_ms != 0) &slot.requested_timeout_ms else null,
+                .max_timeout_ms = self.config.max_timeout_ms,
                 .blocking_flush = if (self.config.execution == .workers and slot.event != .cancelled) .{
                     .context = &streaming,
                     .flush = WorkerFlush.flush,
@@ -1427,6 +1488,8 @@ pub const Server = struct {
         }
         assert(slot.action == .finish);
         slot.request_active = false;
+        // The next request and the idle keep-alive cycle use the default again.
+        slot.timeout_ns = self.config.defaultTimeoutNs();
         assert(slot.request.consumed <= slot.received - slot.input_cursor);
         slot.input_cursor += slot.request.consumed;
         if (!slot.request.keep_alive) return self.drainBatch(index, .close);
@@ -1568,9 +1631,13 @@ pub const Server = struct {
         slot.arena_used = 0;
         // A fresh idle cycle starts after the preceding send finishes. Already
         // buffered partial/current requests retain their earlier deadline.
-        if (slot.batch_next == .parse and !slot.request_active and slot.input_cursor == slot.received)
+        if (slot.batch_next == .parse and !slot.request_active and slot.input_cursor == slot.received) {
+            slot.idle = true;
             slot.request_started = completed_at;
-        slot.deadline = slot.request_started + @as(u64, self.config.timeout_ms) * 1_000_000;
+            slot.deadline = completed_at + self.config.idleTimeoutNs();
+        } else {
+            slot.deadline = slot.request_started + slot.timeout_ns;
+        }
         switch (slot.batch_next) {
             .resume_flush => {
                 assert(slot.request_active);
@@ -1854,6 +1921,99 @@ pub const Server = struct {
         slot.phase.store(.io, .release);
         server.maybeFree(slot);
         try std.testing.expect(!slot.in_use);
+    }
+
+    test "a callback's request timeout replaces the deadline and the next request uses the default" {
+        const server = try Server.init(std.testing.allocator, .{
+            .execution = .inline_event_loop,
+            .workers = 0,
+            .connections = 1,
+            .port = 0,
+            .timeout_ms = 1000,
+            .max_timeout_ms = 60_000,
+        }, struct {
+            fn handler(ctx: *api.Context) api.Action {
+                if (ctx.event == .cancelled) return .close;
+                ctx.requestCancellation();
+                ctx.setRequestTimeout(60_000) catch return .close;
+                return ctx.wait(std.time.ns_per_s) catch .close;
+            }
+        }.handler, null);
+        defer server.deinit();
+        const slot = &server.slots[0];
+        slot.writer.open(0, true, false);
+        slot.request_active = true;
+        slot.in_use = true;
+        slot.request_started = nowNs();
+        slot.timeout_ns = server.config.defaultTimeoutNs();
+        slot.deadline = slot.request_started + slot.timeout_ns;
+        server.free_count = 0;
+        server.stats.live_connections = 1;
+        server.now = slot.request_started;
+        slot.phase.store(.running, .release);
+        server.invokeHandler(slot);
+        try std.testing.expectEqual(@as(u32, 60_000), slot.requested_timeout_ms);
+        try server.serviceSlot(0);
+        try std.testing.expectEqual(@as(u32, 0), slot.requested_timeout_ms);
+        try std.testing.expectEqual(60 * std.time.ns_per_s, slot.timeout_ns);
+        try std.testing.expectEqual(slot.request_started + 60 * std.time.ns_per_s, slot.deadline);
+        try std.testing.expect(slot.resume_at != null and slot.in_use);
+        // The default deadline has passed, but the extended one still holds the wait.
+        const deadline = slot.deadline;
+        slot.resume_at = deadline + 5;
+        server.now = slot.request_started + 2 * std.time.ns_per_s;
+        server.next_timer = server.now;
+        try server.serviceTimers();
+        try std.testing.expectEqual(Phase.io, slot.phase.load(.acquire));
+        try std.testing.expect(!slot.closing and slot.resume_at != null);
+        try std.testing.expectEqual(deadline + 5, server.next_timer.?);
+        // The extended deadline cancels the wait.
+        server.now = deadline + 5;
+        try server.serviceTimers();
+        try std.testing.expectEqual(api.Event.cancelled, slot.event);
+        _ = server.popReady();
+        slot.phase.store(.running, .release);
+        server.invokeHandler(slot);
+        slot.phase.store(.io, .release);
+        server.maybeFree(slot);
+        try std.testing.expect(!slot.in_use);
+    }
+
+    test "an unsent pipelined response keeps its deadline when a later callback extends it" {
+        const server = try Server.init(std.testing.allocator, .{
+            .execution = .inline_event_loop,
+            .workers = 0,
+            .connections = 1,
+            .port = 0,
+            .timeout_ms = 1000,
+            .max_timeout_ms = 60_000,
+        }, struct {
+            fn handler(_: *api.Context) api.Action {
+                unreachable;
+            }
+        }.handler, null);
+        defer server.deinit();
+        const slot = &server.slots[0];
+        slot.request_active = true;
+        slot.request_started = 1000;
+        slot.timeout_ns = server.config.defaultTimeoutNs();
+        slot.deadline = 1000 + slot.timeout_ns;
+        slot.batch_count = 1;
+        slot.requested_timeout_ms = 60_000;
+        server.applyRequestedTimeout(slot);
+        try std.testing.expectEqual(1000 + server.config.defaultTimeoutNs(), slot.deadline);
+        try std.testing.expectEqual(60 * std.time.ns_per_s, slot.timeout_ns);
+        // With no earlier output in the arena, the new deadline applies at once.
+        slot.batch_count = 0;
+        slot.requested_timeout_ms = 30_000;
+        server.applyRequestedTimeout(slot);
+        try std.testing.expectEqual(1000 + 30 * std.time.ns_per_s, slot.deadline);
+        // A finished request cannot extend the next idle cycle.
+        slot.request_active = false;
+        slot.requested_timeout_ms = 60_000;
+        server.applyRequestedTimeout(slot);
+        try std.testing.expectEqual(1000 + 30 * std.time.ns_per_s, slot.deadline);
+        slot.batch_count = 0;
     }
 
     test "a due timer waits for its preceding frozen batch and rearms after release" {
@@ -2743,6 +2903,21 @@ test "configuration rejects combined resource overcommit and impossible worker l
     try std.testing.expectError(error.InvalidConfiguration, (Config{ .response_batch_limit = 512 }).validate());
     try std.testing.expectEqual(@as(usize, 16 * 16), (Config{ .connections = 16, .response_batch_limit = 16 }).effectiveCallbacksPerTurn());
     try std.testing.expectEqual(Config.max_callbacks_per_turn_auto, (Config{ .connections = 4096 }).effectiveCallbacksPerTurn());
+}
+
+test "request timeout bound is disabled by default or covers the default deadline within one day" {
+    try (Config{ .max_timeout_ms = 0 }).validate();
+    try (Config{ .timeout_ms = 5000, .max_timeout_ms = 5000 }).validate();
+    try (Config{ .max_timeout_ms = Config.max_timeout_limit_ms }).validate();
+    try std.testing.expectError(error.InvalidConfiguration, (Config{ .timeout_ms = 5000, .max_timeout_ms = 4999 }).validate());
+    try std.testing.expectError(error.InvalidConfiguration, (Config{ .max_timeout_ms = Config.max_timeout_limit_ms + 1 }).validate());
+}
+
+test "idle timeout defaults to the request timeout and is bounded" {
+    try std.testing.expectEqual(@as(u64, 5000) * std.time.ns_per_ms, (Config{}).idleTimeoutNs());
+    try std.testing.expectEqual(@as(u64, 200) * std.time.ns_per_ms, (Config{ .idle_timeout_ms = 200 }).idleTimeoutNs());
+    try (Config{ .idle_timeout_ms = Config.max_timeout_limit_ms }).validate();
+    try std.testing.expectError(error.InvalidConfiguration, (Config{ .idle_timeout_ms = Config.max_timeout_limit_ms + 1 }).validate());
 }
 
 test "cluster signal stop touches every atomic flag without accessing transports" {
