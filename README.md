@@ -242,7 +242,7 @@ capacity, so heap usage multiplies with shard count even though admission is
 a shared process-wide ceiling. This is not an RSS limit: allocator
 metadata, libc/pthread metadata and actual stack mappings, mapped kernel rings,
 socket queues, loaded assets and arbitrary application allocations require
-separate accounting. Zig 0.16's pthread implementation uses its C allocator for
+separate accounting. Zig 0.17's pthread implementation uses its C allocator for
 thread bookkeeping despite the supplied spawn allocator. The demo seals its
 framework allocator after startup and counts/refuses subsequent allocation
 attempts through it. See [Budget](src/budget.zig) for the implementation.
