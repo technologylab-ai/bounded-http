@@ -1,6 +1,6 @@
 # Module contracts
 
-Exact Zig 0.16.0. The maintained parser, server, writer and platform adapters
+Exact Zig 0.17.0. The maintained parser, server, writer and platform adapters
 share the ownership contract in [OWNERSHIP.md](OWNERSHIP.md).
 
 ## HTTP parser

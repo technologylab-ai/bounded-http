@@ -1,4 +1,9 @@
-# Reproduce the Linux comparison preparation
+# Reproduce the historical Zig 0.16 Linux comparison preparation
+
+This reproducer preserves the September 2026 Zig 0.16.0 comparison pins.
+Use an archived engine commit whose `.zig-version` matches `pins.json`.
+The current engine targets Zig 0.17.0; these historical preparation inputs
+do not qualify its performance and must be ported separately before a new comparison.
 
 `prepare.py` downloads pinned primary sources and package artifacts, verifies their
 hashes, builds the three contenders and wrk, and generates the input for

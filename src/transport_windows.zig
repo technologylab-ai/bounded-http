@@ -103,7 +103,7 @@ fn negative(code: u32) i32 {
         10060 => .TIMEDOUT,
         else => .IO,
     };
-    return -@as(i32, @intFromEnum(err));
+    return -@as(i32, @backingInt(err));
 }
 
 /// One unassociated socket, after its AcceptEx completion was collected.
@@ -222,7 +222,7 @@ pub const Backend = struct {
         const one: i32 = 1;
         // No SO_REUSEADDR: Windows interprets that option differently from POSIX.
         if (win32.setsockopt(listener, ws.SOL.SOCKET, ~@as(i32, ws.SO.REUSEADDR), &one, @sizeOf(i32)) != 0) return error.SocketOptionFailed;
-        var address: ws.sockaddr.in = .{ .port = std.mem.nativeToBig(u16, port_number), .addr = @bitCast(bind_address) };
+        var address: ws.sockaddr.in = .{ .port = std.mem.nativeToBig(u16, port_number), .addr = std.mem.readInt(u32, &bind_address, std.lang.Endian.native) };
         if (win32.bind(listener, @ptrCast(&address), @sizeOf(@TypeOf(address))) != 0) return error.BindFailed;
         if (win32.listen(listener, @intCast(max_connections)) != 0) return error.ListenFailed;
         var length: i32 = @sizeOf(@TypeOf(address));
@@ -955,7 +955,7 @@ test "IOCP direct and acceptor listeners bind the configured IPv4 address" {
             var address: ws.sockaddr.in = undefined;
             var length: i32 = @sizeOf(@TypeOf(address));
             try std.testing.expectEqual(@as(i32, 0), win32.getsockname(backend.listener, @ptrCast(&address), &length));
-            try std.testing.expectEqual(expected, @as([4]u8, @bitCast(address.addr)));
+            try std.testing.expectEqualSlices(u8, &expected, std.mem.asBytes(&address.addr));
             try std.testing.expect(backend.port() != 0);
         }
         var default = if (acceptor)
@@ -966,6 +966,6 @@ test "IOCP direct and acceptor listeners bind the configured IPv4 address" {
         var address: ws.sockaddr.in = undefined;
         var length: i32 = @sizeOf(@TypeOf(address));
         try std.testing.expectEqual(@as(i32, 0), win32.getsockname(default.listener, @ptrCast(&address), &length));
-        try std.testing.expectEqual([4]u8{ 127, 0, 0, 1 }, @as([4]u8, @bitCast(address.addr)));
+        try std.testing.expectEqualSlices(u8, &.{ 127, 0, 0, 1 }, std.mem.asBytes(&address.addr));
     }
 }

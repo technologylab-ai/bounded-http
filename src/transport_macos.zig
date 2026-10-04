@@ -154,13 +154,13 @@ pub const Backend = struct {
             if (op.kind == .accept) {
                 common.configureAccepted(value, true) catch {
                     common.closeFd(value);
-                    value = -@as(i32, @intFromEnum(c.E.IO));
+                    value = -@as(i32, @backingInt(c.E.IO));
                 };
             }
             self.finish(op, value);
         } else switch (c.errno(result)) {
             .AGAIN, .INTR => try self.arm(op),
-            else => |err| self.finish(op, -@as(i32, @intFromEnum(err))),
+            else => |err| self.finish(op, -@as(i32, @backingInt(err))),
         }
     }
 
@@ -208,7 +208,7 @@ pub const Backend = struct {
     pub fn cancel(self: *Backend, cell: u32, token: u64, target_cell: u32) !void {
         assert(cell != target_cell and target_cell < self.operations.len);
         const cancellation = try self.claim(cell);
-        var result: i32 = -@as(i32, @intFromEnum(c.E.NOENT));
+        var result: i32 = -@as(i32, @backingInt(c.E.NOENT));
         const target = &self.operations[target_cell];
         if (target.kind != .free and target.result == null) {
             assert(target.kind != .cancel and target.registered);
@@ -221,7 +221,7 @@ pub const Backend = struct {
                 .udata = 0,
             });
             target.registered = false;
-            self.finish(target, -@as(i32, @intFromEnum(c.E.CANCELED)));
+            self.finish(target, -@as(i32, @backingInt(c.E.CANCELED)));
             result = 0;
         }
         cancellation.* = .{ .kind = .cancel, .token = token };
@@ -277,7 +277,7 @@ pub const Backend = struct {
                 self.finish(op, -@as(i32, @intCast(event.data)));
             } else self.attempt(op) catch {
                 // Once admitted, every operation must produce a terminal result.
-                self.finish(op, -@as(i32, @intFromEnum(c.E.IO)));
+                self.finish(op, -@as(i32, @backingInt(c.E.IO)));
             };
         }
         return collected + if (collected < out.len) self.collect(out[collected..]) else @as(usize, 0);

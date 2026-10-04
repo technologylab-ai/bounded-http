@@ -121,7 +121,7 @@ def main():
     if hasattr(signal, "SIGALRM"):
         signal.alarm(args.timeout)
     try:
-        WIRE.require(binary.is_file(), "build the ReleaseSafe server first: zig build -Doptimize=ReleaseSafe")
+        WIRE.require(binary.is_file(), "build the ReleaseSafe server first: zig build -Doptimize=safe")
         receipt["environment"] = environment()
         receipt["build"].update(binary_sha256=digest(binary),
                                 zig_target=(ROOT / ".zig-version").read_text().strip(),
@@ -135,8 +135,8 @@ def main():
             marker = re.search(r"(?:^|\s)optimize=(\S+)", ready)
             mode = marker.group(1) if marker else None
             receipt["build"]["optimize"] = mode
-            WIRE.require(mode == "ReleaseSafe",
-                         "server READY must report optimize=ReleaseSafe; got %r. Rebuild with -Doptimize=ReleaseSafe" % mode)
+            WIRE.require(mode == "safe",
+                         "server READY must report optimize=safe; got %r. Rebuild with -Doptimize=safe" % mode)
             for name, route, pipeline in WORKLOADS:
                 remaining = deadline - time.monotonic() - 10
                 WIRE.require(remaining > 1, "not enough watchdog budget for workload and safe shutdown")

@@ -89,8 +89,8 @@ def main():
 
     try:
         expected = (ROOT / '.zig-version').read_text().strip()
-        require(expected == '0.16.0' and capture(['zig', 'version']) == expected,
-                'Use exactly the repository Zig 0.16.0 release')
+        require(expected == '0.17.0' and capture(['zig', 'version']) == expected,
+                'Use exactly the repository Zig 0.17.0 release')
         receipt['zig_version'] = expected
         receipt['repository_commit'] = capture(['git', 'rev-parse', 'HEAD'])
         receipt['input_status'] = capture(['git', 'status', '--porcelain=v1', '--untracked-files=all'])
@@ -104,8 +104,8 @@ def main():
                                              'tools/verify_windows.py', 'tools/check_embedding.py',
                                              'tools/smoke.py', 'tools/benchmark.py', 'tools/compare.py')}
         run('verify-debug', ['zig', 'build', 'verify', '--summary', 'all'], 300)
-        run('verify-release-safe', ['zig', 'build', 'verify', '-Doptimize=ReleaseSafe', '--summary', 'all'], 300)
-        run('build-release-safe', ['zig', 'build', '-Doptimize=ReleaseSafe'], 300)
+        run('verify-release-safe', ['zig', 'build', 'verify', '-Doptimize=safe', '--summary', 'all'], 300)
+        run('build-release-safe', ['zig', 'build', '-Doptimize=safe'], 300)
         binary = ROOT / 'zig-out/bin/bounded-http.exe'
         data = binary.read_bytes()
         require(data[:2] == b'MZ' and len(data) >= 64, 'HTTP output is not a PE executable')
@@ -114,7 +114,7 @@ def main():
                 struct.unpack_from('<H', data, offset + 4)[0] == 0x8664,
                 'HTTP executable is not native x64 PE')
         receipt['binary'] = dict(path=str(binary), sha256=digest(binary), pe_machine='8664',
-                               optimize='ReleaseSafe', target='x86_64-windows')
+                               optimize='safe', target='x86_64-windows')
         run('comparator-receipts', [sys.executable, 'tests/test_compare.py', '-v'], 30)
         for suite in ('arena_lifecycle', 'batch', 'gather', 'inline', ''):
             name = (suite + '_' if suite else '') + 'integration'
@@ -141,7 +141,7 @@ def main():
         smoke = json.loads((packet / 'smoke.json').read_text())
         require(smoke['ok'] and smoke['server']['backend'] == 'iocp' and
                 smoke['server']['stats']['completed'] == 30000 and
-                smoke['build']['optimize'] == 'ReleaseSafe', 'Native IOCP smoke receipt mismatch')
+                smoke['build']['optimize'] == 'safe', 'Native IOCP smoke receipt mismatch')
         require(smoke['build']['binary_sha256'] == receipt['binary']['sha256'], 'Binary identity changed')
         receipt['output_status'] = capture(['git', 'status', '--porcelain=v1', '--untracked-files=all'])
         require(not receipt['output_status'], 'Verification modified the checkout')

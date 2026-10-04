@@ -5,7 +5,7 @@ Use `bounded-http` for the repository, directory, executable, and HTTP Server to
 Use `bounded_http` for the Zig package, dependency key, and module.
 Preserve historical evidence names and the shared `/tmp/zig-http-measurement.lock` path.
 
-Use exact Zig 0.16.0 from `.zig-version`. This standalone M4 implementation is
+Use exact Zig 0.17.0 from `.zig-version`. This standalone M4 implementation is
 informed by `../zigllmwiki`; runnable server code belongs here under `src/` and
 tests, not copied into wiki pages. Preserve the wiki's source/evidence hierarchy.
 

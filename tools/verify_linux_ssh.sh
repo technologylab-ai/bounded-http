@@ -27,8 +27,8 @@ COPYFILE_DISABLE=1 tar --no-xattrs --exclude=.git --exclude=.zig-cache \
             "$(cat /proc/sys/kernel/io_uring_disabled)"
         cat /etc/os-release
         timeout 180 zig build verify --summary all
-        timeout 180 zig build verify -Doptimize=ReleaseSafe --summary all
-        timeout 180 zig build -Doptimize=ReleaseSafe
+        timeout 180 zig build verify -Doptimize=safe --summary all
+        timeout 180 zig build -Doptimize=safe
         PYTHONDONTWRITEBYTECODE=1 python3 tests/test_compare.py -v
         PYTHONDONTWRITEBYTECODE=1 python3 tests/arena_lifecycle_integration.py
         PYTHONDONTWRITEBYTECODE=1 python3 tests/batch_integration.py

@@ -173,6 +173,9 @@ def idle_keep_alive_then_request(mode):
     options = shared_options(mode)
     options['timeout_ms'] = 500
     options['max_timeout_ms'] = 1000
+    # This fixture checks request deadlines, not idle expiry. Keep a separate
+    # idle budget so hosted scheduling cannot consume the 100 ms idle margin.
+    options['idle_timeout_ms'] = 3000
     options['deadline_sweep_ms'] = 5
     with Server(**options, stall_ms=350) as server:
         with server.connect(timeout=5) as client:

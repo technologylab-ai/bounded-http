@@ -75,7 +75,7 @@ The reader vendors Marked, DOMPurify, and Highlight.js.
 [The vendor manifest](vendor/manifest.json) pins package versions, archive integrity, and extracted file hashes.
 Adjacent license files preserve each dependency's license terms.
 The site uses no external script or stylesheet service.
-The Zig highlighting rules follow the exact 0.16.0 tokenizer keywords.
+The Zig highlighting rules follow the exact 0.17.0 tokenizer keywords.
 
 ## Project names
 

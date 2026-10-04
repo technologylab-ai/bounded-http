@@ -29,20 +29,16 @@ jobs:
       - name: Check out the selected revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install checksum-verified exact Zig 0.16.0
+      - name: Install checksum-verified exact Zig 0.17.0
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $baseline = (Get-Content -Raw ".zig-version").Trim()
-          if ($baseline -cne "0.16.0") { throw "This gate requires the exact repository 0.16.0 baseline" }
-          $indexUrl = "https://ziglang.org/download/index.json"
+          if ($baseline -cne "0.17.0") { throw "This gate requires the exact repository 0.17.0 baseline" }
           $headers = @{ "User-Agent" = "bounded-http-windows-verification/1" }
-          $index = Invoke-RestMethod -Uri $indexUrl -Headers $headers -TimeoutSec 30
-          $release = $index.PSObject.Properties[$baseline]
-          if ($null -eq $release) { throw "Official index lacks the requested release" }
-          $entry = $release.Value.PSObject.Properties["x86_64-windows"]
-          if ($null -eq $entry) { throw "Official index lacks the native x64 compiler" }
-          $artifact = $entry.Value
+          $metadata = Get-Content -Raw .github/zig-release.json | ConvertFrom-Json
+          if ($metadata.version -cne $baseline) { throw "Compiler metadata version mismatch" }
+          $artifact = $metadata.artifacts.PSObject.Properties["x86_64-windows"].Value
           $url = [string] $artifact.tarball
           $expected = ([string] $artifact.shasum).ToLowerInvariant()
           if ($url -notmatch '^https://ziglang\.org/' -or $expected -notmatch '^[0-9a-f]{64}$') {
