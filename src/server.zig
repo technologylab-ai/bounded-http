@@ -244,8 +244,7 @@ pub const Stats = struct {
 
     /// Sum counters and take maxima; used when several shards report together.
     pub fn merge(self: *Stats, other: Stats) void {
-        inline for (@typeInfo(Stats).@"struct".fields) |field| {
-            const name = field.name;
+        inline for (@typeInfo(Stats).@"struct".field_names) |name| {
             if (comptime std.mem.startsWith(u8, name, "max_")) {
                 @field(self, name) = @max(@field(self, name), @field(other, name));
             } else if (comptime std.mem.eql(u8, name, "execution") or std.mem.eql(u8, name, "gather_send") or
@@ -265,8 +264,8 @@ pub const Stats = struct {
 const Phase = enum(u8) { io, ready, running, stream_ready, stream_wait, result };
 const SendMode = enum { response, interim, reject };
 const Kind = enum(u8) { accept = 1, recv, send, cancel_recv, cancel_send, cancel_accept };
-const accept_token: u64 = @intFromEnum(Kind.accept);
-const cancel_accept_token: u64 = @intFromEnum(Kind.cancel_accept);
+const accept_token: u64 = @backingInt(Kind.accept);
+const cancel_accept_token: u64 = @backingInt(Kind.cancel_accept);
 
 const BatchNext = enum { parse, resume_flush, resume_timer, close };
 
@@ -907,7 +906,7 @@ pub const Server = struct {
     }
 
     fn tokenFor(slot: *const Slot, index: usize, kind: Kind) u64 {
-        return (@as(u64, slot.generation) << 32) | (@as(u64, index) << 8) | @intFromEnum(kind);
+        return (@as(u64, slot.generation) << 32) | (@as(u64, index) << 8) | @backingInt(kind);
     }
 
     fn distributeAccepted(self: *Server, socket: transport.Socket) !void {
@@ -1047,7 +1046,7 @@ pub const Server = struct {
     fn onCompletion(self: *Server, completion: transport.Completion) !void {
         assert(self.stats.live_operations > 0);
         self.stats.live_operations -= 1;
-        const kind: Kind = @enumFromInt(@as(u8, @truncate(completion.token)));
+        const kind: Kind = @fromBackingInt(@as(u8, @truncate(completion.token)));
         if (kind == .cancel_accept) {
             assert(self.accept_cancel_pending);
             self.accept_cancel_pending = false;
@@ -1105,7 +1104,7 @@ pub const Server = struct {
                 assert(@as(usize, @intCast(completion.result)) <= slot.send_submitted_bytes);
                 if (@as(usize, @intCast(completion.result)) < slot.send_submitted_bytes)
                     self.stats.short_send_completions += 1;
-            } else if (slot.send_is_gather and completion.result == -@as(i32, @intFromEnum(c.E.CANCELED))) {
+            } else if (slot.send_is_gather and completion.result == -@as(i32, @backingInt(c.E.CANCELED))) {
                 self.stats.gather_canceled_completions += 1;
             }
         }
@@ -1688,13 +1687,13 @@ pub const Server = struct {
         slot.cancelled.store(true, .release);
         if (slot.fd >= 0) self.backend.shutdown(slot.fd);
         if (slot.recv_pending and !slot.recv_cancel_pending) {
-            const token = (slot.recv_token & ~@as(u64, 255)) | @intFromEnum(Kind.cancel_recv);
+            const token = (slot.recv_token & ~@as(u64, 255)) | @backingInt(Kind.cancel_recv);
             try self.backend.cancel(self.recvCancelCell(index), token, self.recvCell(index));
             slot.recv_cancel_pending = true;
             self.operationAdded();
         }
         if (slot.send_pending and !slot.send_cancel_pending) {
-            const token = (slot.send_token & ~@as(u64, 255)) | @intFromEnum(Kind.cancel_send);
+            const token = (slot.send_token & ~@as(u64, 255)) | @backingInt(Kind.cancel_send);
             try self.backend.cancel(self.sendCancelCell(index), token, self.sendCell(index));
             if (slot.send_is_gather) {
                 self.stats.gather_cancel_requests += 1;
@@ -2442,7 +2441,7 @@ pub const Server = struct {
         const time = epoch.getDaySeconds();
         const weekdays = [_][]const u8{ "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
         const months = [_][]const u8{ "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
-        _ = std.fmt.bufPrint(&self.date, "{s}, {d:0>2} {s} {d:0>4} {d:0>2}:{d:0>2}:{d:0>2} GMT", .{ weekdays[(day.day + 4) % 7], @as(u8, month_day.day_index) + 1, months[@intFromEnum(month_day.month) - 1], year_day.year, time.getHoursIntoDay(), time.getMinutesIntoHour(), time.getSecondsIntoMinute() }) catch unreachable;
+        _ = std.fmt.bufPrint(&self.date, "{s}, {d:0>2} {s} {d:0>4} {d:0>2}:{d:0>2}:{d:0>2} GMT", .{ weekdays[(day.day + 4) % 7], @as(u8, month_day.day_index) + 1, months[@backingInt(month_day.month) - 1], year_day.year, time.getHoursIntoDay(), time.getMinutesIntoHour(), time.getSecondsIntoMinute() }) catch unreachable;
         self.header_cache.refresh(&self.date);
     }
 };

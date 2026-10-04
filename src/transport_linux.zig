@@ -197,7 +197,7 @@ pub const Backend = struct {
             if (op.kind == .accept and result >= 0) {
                 common.configureAccepted(result, false) catch {
                     common.closeFd(result);
-                    result = -@as(i32, @intFromEnum(c.E.IO));
+                    result = -@as(i32, @backingInt(c.E.IO));
                 };
             }
             completion.* = .{ .token = op.token, .result = result };

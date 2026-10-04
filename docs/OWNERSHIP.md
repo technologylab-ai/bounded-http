@@ -2,7 +2,7 @@
 
 This describes the current [server](../src/server.zig),
 [application API](../src/api.zig), [parser](../src/http.zig) and
-[transport selection](../src/transport.zig), using exact Zig 0.16.0. It is an
+[transport selection](../src/transport.zig), using exact Zig 0.17.0. It is an
 experimental execution contract, informed by the [evidence inputs](EVIDENCE.md).
 The [module contracts](INTERFACES.md) describe the low-level interfaces.
 

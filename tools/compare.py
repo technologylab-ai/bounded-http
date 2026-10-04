@@ -47,7 +47,7 @@ def validate_framework_ready(server, log):
     if not is_framework(server):
         return
     require('READY ' in log, 'framework READY missing')
-    require('optimize=ReleaseSafe' in log, 'benchmark requires ReleaseSafe')
+    require(any(marker in log for marker in ('optimize=safe', 'optimize=ReleaseSafe')), 'benchmark requires ReleaseSafe')
 
 
 def parse_framework_stats(server, exit_code, log):

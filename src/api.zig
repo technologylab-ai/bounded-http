@@ -757,7 +757,7 @@ test "extra header validation is transactional and bounded before begin" {
     try std.testing.expect(!writer.began and writer.buffered == 0);
     try writer.beginWithHeaders(303, "text/plain", 0, "Location: /next\r\nSet-Cookie: a=1\r\nSet-Cookie: b=2\r\n");
     _ = writer.finish();
-    try std.testing.expect(std.mem.indexOf(u8, arena[0..writer.buffered], "HTTP/1.1 303 See Other\r\n") != null);
+    try std.testing.expect(std.mem.find(u8, arena[0..writer.buffered], "HTTP/1.1 303 See Other\r\n") != null);
     try std.testing.expect(std.mem.endsWith(u8, arena[0..writer.buffered], "Location: /next\r\nSet-Cookie: a=1\r\nSet-Cookie: b=2\r\n\r\n"));
     writer.release();
     writer.open(arena.len - header_reserve_bytes, true, false);
@@ -860,7 +860,7 @@ test "draft header aliases copy before storage is reused and preserve repeated f
     @memset(scratch[fields_at..][0..fields.len], 'x');
     try std.testing.expectEqualStrings(content_type, writer.content_type);
     _ = writer.finish();
-    try std.testing.expect(std.mem.indexOf(u8, arena[0..writer.body_start], "Content-Type: application/example\r\n") != null);
+    try std.testing.expect(std.mem.find(u8, arena[0..writer.body_start], "Content-Type: application/example\r\n") != null);
     try std.testing.expect(std.mem.endsWith(u8, arena[0..writer.body_start], fields ++ "\r\n"));
 }
 

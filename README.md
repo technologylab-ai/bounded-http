@@ -4,7 +4,7 @@
 
 **Fast by design. Explicit about limits.**
 
-An experimental HTTP/1.1 framework and reference server for **Zig 0.16.0**, built on **native event-driven networking**.
+An experimental HTTP/1.1 framework and reference server for **Zig 0.17.0**, built on **native event-driven networking**.
 
 | Platform | Native backend | Network progress |
 | --- | --- | --- |
@@ -61,8 +61,8 @@ ReleaseSafe is the preferred experiment mode; assertions remain enabled.
 
 ```sh
 zig version
-zig build verify -Doptimize=ReleaseSafe
-zig build -Doptimize=ReleaseSafe
+zig build verify -Doptimize=safe
+zig build -Doptimize=safe
 ./zig-out/bin/bounded-http --port 8080 --connections 128
 ```
 
@@ -85,7 +85,7 @@ Linux shard listeners and the Windows acceptor receive the same configured addre
 
 See the [architecture guide](docs/ARCHITECTURE.md#windows-socket-handoff) and [native shard receipt](reports/2026-09-06-windows-shards.md).
 
-The version must print `0.16.0`. The server prints `READY` to stderr after
+The version must print `0.17.0`. The server prints `READY` to stderr after
 startup. Linux and macOS accept SIGINT or SIGTERM; Windows consoles accept Ctrl-C or Ctrl-Break.
 `--duration-ms 30000` requests
 shutdown after a finite run. `--port 0` asks the OS for an available
@@ -114,7 +114,7 @@ Debug as well:
 
 ```sh
 python3 tests/integration.py --server zig-out/bin/bounded-http --json .zig-cache/integration.json
-zig build verify -Doptimize=Debug
+zig build verify -Doptimize=debug
 ```
 
 For Linux Debug, `build.zig` explicitly selects bundled LLVM/LLD after the native

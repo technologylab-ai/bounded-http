@@ -460,7 +460,7 @@ const Lane = @Vector(16, u8);
 /// is cheaper than the generic slice comparison for these tiny fixed names.
 pub inline fn fixedEqual(bytes: []const u8, comptime expected: []const u8) bool {
     if (bytes.len != expected.len) return false;
-    const Int = std.meta.Int(.unsigned, 8 * expected.len);
+    const Int = @Int(.unsigned, 8 * expected.len);
     const actual: Int = @bitCast(bytes[0..expected.len].*);
     const wanted: Int = @bitCast(expected[0..expected.len].*);
     return actual == wanted;
@@ -476,8 +476,9 @@ inline fn fixedEqualCase(bytes: []const u8, comptime expected: []const u8) bool 
         std.debug.assert(std.ascii.isLower(c) or std.ascii.isDigit(c) or c == '-');
     };
     if (bytes.len != expected.len) return false;
-    const Int = std.meta.Int(.unsigned, 8 * expected.len);
-    const fold: Int = @bitCast([_]u8{0x20} ** expected.len);
+    const Int = @Int(.unsigned, 8 * expected.len);
+    const fold_bytes: [expected.len]u8 = @splat(0x20);
+    const fold: Int = @bitCast(fold_bytes);
     const actual: Int = @bitCast(bytes[0..expected.len].*);
     const wanted: Int = @bitCast(expected[0..expected.len].*);
     return (actual | fold) == wanted;
@@ -491,6 +492,7 @@ fn findLineControl(bytes: []const u8, start: usize) ?usize {
     const lf: Lane = @splat('\n');
     while (at + 16 <= bytes.len) : (at += 16) {
         const lane: Lane = bytes[at..][0..16].*;
+        // Logical bit order maps lane zero to the least-significant bit.
         const hits: u16 = @bitCast((lane == cr) | (lane == lf));
         if (hits != 0) return at + @ctz(hits);
     }
@@ -878,6 +880,96 @@ test "byte class tables agree with the slow classifiers for every octet" {
     }
 }
 
+test "fixed name bit casts agree with scalar byte equality and ASCII folding" {
+    const Oracle = struct {
+        fn same(bytes: []const u8, expected: []const u8, fold_case: bool) bool {
+            if (bytes.len != expected.len) return false;
+            for (bytes, expected) |actual, wanted| {
+                if ((if (fold_case) std.ascii.toLower(actual) else actual) != wanted) return false;
+            }
+            return true;
+        }
+    };
+    inline for (.{ "", "a", "get", "host", "close", "http/1.1", "connection", "content-length", "proxy-connection", "transfer-encoding" }) |name| {
+        var bytes: [name.len]u8 = undefined;
+        @memcpy(&bytes, name);
+        try testing.expect(fixedEqual(&bytes, name));
+        try testing.expect(!fixedEqual(name ++ "x", name));
+        for (0..bytes.len) |at| {
+            for (0..256) |number| {
+                bytes[at] = @intCast(number);
+                try testing.expectEqual(Oracle.same(&bytes, name, false), fixedEqual(&bytes, name));
+            }
+            bytes[at] = name[at];
+        }
+    }
+    inline for (.{ "", "a", "get", "host", "close", "connection", "content-length", "proxy-connection", "transfer-encoding", "100-continue" }) |name| {
+        var bytes: [name.len]u8 = undefined;
+        @memcpy(&bytes, name);
+        try testing.expect(fixedEqualCase(&bytes, name));
+        try testing.expect(!fixedEqualCase(name ++ "x", name));
+        for (0..bytes.len) |at| {
+            for (0..256) |number| {
+                const byte: u8 = @intCast(number);
+                // The parser validates field octets before using the folding helper.
+                if ((byte < 0x20 and byte != '\t') or byte == 0x7f) continue;
+                bytes[at] = byte;
+                try testing.expectEqual(Oracle.same(&bytes, name, true), fixedEqualCase(&bytes, name));
+            }
+            bytes[at] = name[at];
+        }
+    }
+}
+
+test "vector delimiter scans agree with scalar indices across lanes starts and tails" {
+    const Oracle = struct {
+        fn lineControl(bytes: []const u8, start: usize) ?usize {
+            for (bytes[start..], start..) |byte, at| {
+                if (byte == '\r' or byte == '\n') return at;
+            }
+            return null;
+        }
+
+        fn byteIndex(bytes: []const u8, needle: u8) ?usize {
+            for (bytes, 0..) |byte, at| {
+                if (byte == needle) return at;
+            }
+            return null;
+        }
+
+        fn compare(bytes: []const u8, start: usize, needle: u8) !void {
+            try testing.expectEqual(lineControl(bytes, start), findLineControl(bytes, start));
+            try testing.expectEqual(byteIndex(bytes[start..], needle), findByte(bytes[start..], needle));
+        }
+    };
+    var bytes: [65]u8 = @splat('x');
+    const lengths = [_]usize{ 0, 1, 15, 16, 17, 31, 32, 33, 47, 48, 49, 63, 64, 65 };
+    for (lengths) |length| {
+        const prefix = bytes[0..length];
+        for (0..length + 1) |start| try Oracle.compare(prefix, start, ':');
+        for (0..length) |position| {
+            for ([_]u8{ '\r', '\n', ':', ' ' }) |needle| {
+                bytes[position] = needle;
+                for (0..length + 1) |start| try Oracle.compare(prefix, start, needle);
+            }
+            bytes[position] = 'x';
+        }
+    }
+    for (0..bytes.len) |first| {
+        for (first + 1..bytes.len) |second| {
+            bytes[first] = '\r';
+            bytes[second] = '\n';
+            const starts = [_]usize{ 0, first, first + 1, second, second + 1, bytes.len };
+            for (starts) |start| try Oracle.compare(&bytes, start, '\n');
+            bytes[first] = ':';
+            bytes[second] = ':';
+            for (starts) |start| try Oracle.compare(&bytes, start, ':');
+            bytes[first] = 'x';
+            bytes[second] = 'x';
+        }
+    }
+}
+
 test "vectorised line scanning rejects bare CR/LF at every fragment boundary" {
     // Every CR position and every split must produce the same verdict as the
     // whole-buffer parse, and a CR must never be rescanned into acceptance.
@@ -1042,7 +1134,8 @@ test "transfer coding order and parameters distinguish invalid from unsupported"
 
 test "chunk extension line budget bounds incremental scanning" {
     const head = "POST / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n";
-    const wire = head ++ "1;" ++ "a" ** 64 ++ "=x\r\na\r\n0\r\n\r\n";
+    const extension: [64]u8 = @splat('a');
+    const wire = head ++ "1;" ++ extension ++ "=x\r\na\r\n0\r\n\r\n";
     var parser = Parser.init(.{ .max_header_bytes = 64 });
     for (0..head.len + 64) |length| try testing.expectEqual(null, try parser.parse(wire[0..length]));
     try testing.expectError(error.BodyTooLarge, parser.parse(wire[0 .. head.len + 64]));

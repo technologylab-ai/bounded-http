@@ -1,7 +1,7 @@
 # Using bounded/http
 
 Use the exported `bounded_http` module to embed the framework in a Zig application.
-Use exact Zig 0.16.0, as specified by [.zig-version](../.zig-version).
+Use exact Zig 0.17.0, as specified by [.zig-version](../.zig-version).
 The framework has Linux, macOS, and Windows transport adapters.
 The [Windows receipt](../reports/2026-09-06-windows-iocp.md) records native verification and its exclusions.
 
@@ -20,12 +20,12 @@ Run these commands from the repository root:
 
 ```sh
 zig version
-zig build verify -Doptimize=ReleaseSafe
-zig build -Doptimize=ReleaseSafe
+zig build verify -Doptimize=safe
+zig build -Doptimize=safe
 ./zig-out/bin/bounded-http --port 8080 --connections 128 --shards 1
 ```
 
-The version command must print `0.16.0`.
+The version command must print `0.17.0`.
 ReleaseSafe preserves assertions and runtime safety checks.
 The project also supports Debug.
 The build rejects ReleaseFast and ReleaseSmall.
@@ -40,7 +40,7 @@ Windows defaults to one shard.
 Use `--shards 3` to select three independent IOCP owners with one bounded socket distributor.
 Only inline execution supports multiple shards.
 The [handoff guide](ARCHITECTURE.md#windows-socket-handoff) explains ownership, resource bounds, and shutdown.
-Use native x64 Zig 0.16.0 for the maintained Windows gate.
+Use native x64 Zig 0.17.0 for the maintained Windows gate.
 
 The server prints `READY` to stderr after preparing its resources.
 Request `/plaintext` for the fixed 13-byte `Hello, World!` response.
@@ -85,8 +85,8 @@ Run the independent example from its directory:
 
 ```sh
 cd examples/embedding
-zig build -Doptimize=ReleaseSafe
-zig build run -Doptimize=ReleaseSafe -- --port 8081 --duration-ms 30000
+zig build -Doptimize=safe
+zig build run -Doptimize=safe -- --port 8081 --duration-ms 30000
 ```
 
 The example replies to GET and HEAD requests on any path.
@@ -517,7 +517,7 @@ CPU accounting fields remain `null` where the Windows client cannot measure them
 | Tool or suite | Purpose |
 | --- | --- |
 | `zig build verify` | Check the compiler version, formatting, executable, and registered Zig tests. |
-| `zig build check -Dtarget=x86_64-windows -Doptimize=ReleaseSafe` | Cross-compile the Windows executable and Zig tests without running them. |
+| `zig build check -Dtarget=x86_64-windows -Doptimize=safe` | Cross-compile the Windows executable and Zig tests without running them. |
 | [integration suites](../tests) | Exercise framing, bounds, partial progress, batches, cancellation, and shutdown. |
 | [smoke.py](../tools/smoke.py) | Run a finite verified request smoke experiment. |
 | [benchmark.py](../tools/benchmark.py) | Check response bodies while measuring a supplied endpoint. |

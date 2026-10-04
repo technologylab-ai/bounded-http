@@ -40,7 +40,7 @@ fn size(rc: usize) isize {
 /// The error of a failed call (`rc == -1`), else `.SUCCESS`.
 pub fn errno(rc: anytype) E {
     if (!direct) return c.errno(rc);
-    return if (rc == -1) @enumFromInt(@intFromEnum(last_errno)) else .SUCCESS;
+    return if (rc == -1) @fromBackingInt(@backingInt(last_errno)) else .SUCCESS;
 }
 
 pub fn socket(domain: c_uint, socket_type: c_uint, protocol: c_uint) c_int {

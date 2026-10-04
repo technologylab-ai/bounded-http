@@ -5,7 +5,7 @@ pub fn build(b: *std.Build) void {
         @panic("Use exactly the Zig release in .zig-version");
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
-    if (optimize == .ReleaseFast or optimize == .ReleaseSmall) {
+    if (optimize == .fast or optimize == .small) {
         @panic("This MVP requires Debug or ReleaseSafe so its invariants remain enabled");
     }
     const module = b.addModule("bounded_http", .{
@@ -19,8 +19,8 @@ pub fn build(b: *std.Build) void {
     // Zig 0.16's native ELF linker rejects. Use the bundled LLVM/LLD path
     // for Linux Debug only; it matters only when an application links glibc.
     const exe = b.addExecutable(.{
-        .use_llvm = if (target.result.os.tag == .linux and optimize == .Debug) true else null,
-        .use_lld = if (target.result.os.tag == .linux and optimize == .Debug) true else null,
+        .use_llvm = if (target.result.os.tag == .linux and optimize == .debug) true else null,
+        .use_lld = if (target.result.os.tag == .linux and optimize == .debug) true else null,
         .name = "bounded-http",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
@@ -31,27 +31,28 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(exe);
     const run = b.addRunArtifact(exe);
-    if (b.args) |args| run.addArgs(args);
+    run.addPassthruArgs();
     b.step("run", "Run the bounded HTTP experiment").dependOn(&run.step);
     const compile_only = b.step("check", "Compile the selected target without executing its binaries");
     compile_only.dependOn(&exe.step);
     const verify = b.step("verify", "Compile and test the exact-version MVP");
     verify.dependOn(&exe.step);
-    const format = b.addFmt(.{ .paths = &.{ "build.zig", "build.zig.zon", "src", "examples" }, .check = true });
+    const format = b.addFmt(.{ .paths = b.pathList(&.{ "build.zig", "build.zig.zon", "src", "examples" }), .check = true });
     verify.dependOn(&format.step);
     const version = b.addSystemCommand(&.{ "python3", "tools/check_version.py" });
     verify.dependOn(&version.step);
-    const embedding_prefix = b.pathFromRoot(b.fmt(".zig-cache/embedding-{s}", .{@tagName(optimize)}));
-    const embedding_build = b.addSystemCommand(&.{ b.graph.zig_exe, "build", b.fmt("-Doptimize={s}", .{@tagName(optimize)}), "--prefix", embedding_prefix });
+    const embedding_build = b.addSystemCommand(&.{ b.graph.zig_exe, "build", b.fmt("-Doptimize={s}", .{@tagName(optimize)}) });
+    embedding_build.addArg("--prefix");
+    const embedding_prefix = embedding_build.addOutputDirectoryArg2("embedding", .{ .make_absolute = true });
     embedding_build.setCwd(b.path("examples/embedding"));
     const embedding_name = if (target.result.os.tag == .windows) "embedded-http.exe" else "embedded-http";
-    const embedding_check = b.addSystemCommand(&.{ "python3", "tools/check_embedding.py", "--binary", b.pathJoin(&.{ embedding_prefix, "bin", embedding_name }) });
-    embedding_check.step.dependOn(&embedding_build.step);
+    const embedding_check = b.addSystemCommand(&.{ "python3", "tools/check_embedding.py", "--binary" });
+    embedding_check.addFileArg2(embedding_prefix.path(b, b.pathJoin(&.{ "bin", embedding_name })), .{ .make_absolute = true });
     b.step("example-check", "Compile and exercise the independent embedding project").dependOn(&embedding_check.step);
     verify.dependOn(&embedding_check.step);
     const test_step = b.step("test", "Run unit and transport tests");
     for ([_][]const u8{ "src/http.zig", "src/api.zig", "src/budget.zig", "src/transport.zig", "src/server.zig", "src/sys.zig" }) |path| {
-        const tests = b.addTest(.{ .use_llvm = if (target.result.os.tag == .linux and optimize == .Debug) true else null, .use_lld = if (target.result.os.tag == .linux and optimize == .Debug) true else null, .root_module = b.createModule(.{
+        const tests = b.addTest(.{ .use_llvm = if (target.result.os.tag == .linux and optimize == .debug) true else null, .use_lld = if (target.result.os.tag == .linux and optimize == .debug) true else null, .root_module = b.createModule(.{
             .root_source_file = b.path(path),
             .target = target,
             .optimize = optimize,

@@ -2,6 +2,6 @@
     .name = .bounded_http,
     .version = "0.1.0",
     .fingerprint = 0xea644817b8357037,
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0",
     .paths = .{ "build.zig", "build.zig.zon", ".zig-version", "src", "tests", "tools", "assets", "docs", "examples", "README.md", "AGENTS.md" },
 }

@@ -72,7 +72,7 @@ pub fn listenBound(bind_address: [4]u8, port_number: u16, max_connections: u16, 
     }
     var address: c.sockaddr.in = .{
         .port = std.mem.nativeToBig(u16, port_number),
-        .addr = @bitCast(bind_address),
+        .addr = std.mem.readInt(u32, &bind_address, std.lang.Endian.native),
     };
     if (sys.bind(fd, @ptrCast(&address), @sizeOf(@TypeOf(address))) != 0) return error.BindFailed;
     if (sys.listen(fd, @intCast(max_connections)) != 0) return error.ListenFailed;
@@ -86,7 +86,7 @@ pub fn setFlags(fd: Socket, nonblocking: bool) !void {
     if (nonblocking) {
         const flags = sys.fcntl(fd, c.F.GETFL, 0);
         if (flags < 0) return error.SocketFlagsFailed;
-        const nonblock: u32 = @bitCast(c.O{ .NONBLOCK = true });
+        const nonblock: u32 = @backingInt(c.O{ .NONBLOCK = true });
         if (sys.fcntl(fd, c.F.SETFL, @intCast(flags | @as(c_int, @intCast(nonblock)))) < 0) return error.SocketFlagsFailed;
     }
 }
@@ -142,7 +142,7 @@ test "accept cancellation drains target and cancellation acknowledgement separat
             11 => {
                 try std.testing.expect(!target);
                 target = true;
-                try std.testing.expectEqual(-@as(i32, @intFromEnum(c.E.CANCELED)), completion.result);
+                try std.testing.expectEqual(-@as(i32, @backingInt(c.E.CANCELED)), completion.result);
             },
             12 => {
                 try std.testing.expect(!cancellation);
@@ -212,7 +212,7 @@ test "transport borrows receive and send buffers and accounts for EOF" {
             25 => {
                 try std.testing.expect(!canceled_receive);
                 canceled_receive = true;
-                try std.testing.expectEqual(-@as(i32, @intFromEnum(c.E.CANCELED)), completion.result);
+                try std.testing.expectEqual(-@as(i32, @backingInt(c.E.CANCELED)), completion.result);
             },
             26 => {
                 try std.testing.expect(!cancel_acknowledged);
@@ -241,7 +241,7 @@ test "wake is coalesced and does not consume a caller completion token" {
     try backend.cancel(2, 31, 0);
     const missing = try waitCompletion(&backend);
     try std.testing.expectEqual(@as(u64, 31), missing.token);
-    try std.testing.expectEqual(-@as(i32, @intFromEnum(c.E.NOENT)), missing.result);
+    try std.testing.expectEqual(-@as(i32, @backingInt(c.E.NOENT)), missing.result);
 }
 
 test "cancellation cells are finite and returned completions replenish them" {
@@ -301,7 +301,7 @@ test "listener binds the configured IPv4 address and preserves loopback default"
         defer closeFd(configured.socket);
         var length: c.socklen_t = @sizeOf(@TypeOf(address));
         try std.testing.expectEqual(@as(c_int, 0), sys.getsockname(configured.socket, @ptrCast(&address), &length));
-        try std.testing.expectEqual(expected, @as([4]u8, @bitCast(address.addr)));
+        try std.testing.expectEqualSlices(u8, &expected, std.mem.asBytes(&address.addr));
         try std.testing.expect(configured.port != 0);
     }
 
@@ -309,5 +309,5 @@ test "listener binds the configured IPv4 address and preserves loopback default"
     defer closeFd(default.socket);
     var length: c.socklen_t = @sizeOf(@TypeOf(address));
     try std.testing.expectEqual(@as(c_int, 0), sys.getsockname(default.socket, @ptrCast(&address), &length));
-    try std.testing.expectEqual(std.mem.nativeToBig(u32, 0x7f000001), address.addr);
+    try std.testing.expectEqualSlices(u8, &.{ 127, 0, 0, 1 }, std.mem.asBytes(&address.addr));
 }
